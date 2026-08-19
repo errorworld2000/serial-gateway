@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SERIAL GATEWAY</title>
+    <!-- xterm.js -->
+    <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
+    <script src="/vendor/xterm/xterm.js"></script>
+
+    <style>
+        :root {
+            /* Nothing Design Tokens - Dark Mode */
+            --black: #000000;
+            --surface: #111111;
+            --surface-raised: #1A1A1A;
+            --border: #222222;
+            --border-visible: #333333;
+            --text-disabled: #666666;
+            --text-secondary: #999999;
+            --text-primary: #E8E8E8;
+            --text-display: #FFFFFF;
+            --accent: #D71921;
+            --success: #4A9E5C;
+
+            /* Typography */
+            --font-display: "Segoe UI", Arial, sans-serif;
+            --font-body: "Segoe UI", Arial, sans-serif;
+            --font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+        }
+
+        body {
+            background-color: var(--black);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+
+            /* Dot-matrix motif background */
+            background-image: radial-gradient(circle, var(--border-visible) 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+
+        header {
+            padding: 48px 48px 16px 48px;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: 36px;
+            font-weight: 600;
+            color: var(--text-display);
+            margin: 0;
+            letter-spacing: -0.02em;
+            text-transform: uppercase;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--border-visible);
+            padding-bottom: 0px;
+        }
+
+        .tab {
+            background: transparent;
+            border: 1px solid transparent;
+            border-bottom: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 8px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--text-display);
+            background: var(--surface);
+            border: 1px solid var(--border-visible);
+            border-bottom: 1px solid var(--surface);
+            margin-bottom: -1px; /* Overlay border bottom */
+        }
+
+        .status-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--text-disabled);
+        }
+        .status-indicator.connected {
+            background-color: var(--success);
+        }
+
+        .terminal-containers {
+            flex-grow: 1;
+            background-color: var(--surface);
+            border: 1px solid var(--border-visible);
+            border-top: none;
+            margin: 0 48px 48px 48px;
+            position: relative;
+        }
+
+        .terminal-container {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            padding: 16px;
+            display: none;
+        }
+
+        .terminal-container.active {
+            display: block;
+        }
+
+        /* Customize xterm.js selection and scrollbar to match aesthetic */
+        .xterm-viewport::-webkit-scrollbar {
+            width: 8px;
+        }
+        .xterm-viewport::-webkit-scrollbar-track {
+            background: var(--surface);
+        }
+        .xterm-viewport::-webkit-scrollbar-thumb {
+            background: var(--border-visible);
+        }
+        .xterm-viewport::-webkit-scrollbar-thumb:hover {
+            background: var(--text-disabled);
+        }
+
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Serial Gateway</h1>
+        <div class="tabs" id="tabs-container">
+            <!-- Tabs will be dynamically added here -->
+        </div>
+    </header>
+
+    <div class="terminal-containers" id="terminals-wrapper">
+        <!-- Terminal divs will be dynamically added here -->
+    </div>
+
+    <script>
+        const tabsContainer = document.getElementById('tabs-container');
+        const terminalsWrapper = document.getElementById('terminals-wrapper');
+
+        const sessions = {};
+        let activePort = null;
+
+        let refreshing = false;
+
+        async function refreshPorts() {
+            if (refreshing) return;
+            refreshing = true;
+            try {
+                const response = await fetch('/api/v1/ports');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const payload = await response.json();
+                const ports = payload.ports || [];
+
+                if (ports.length === 0 && Object.keys(sessions).length === 0) {
+                    tabsContainer.innerHTML = '<div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); padding: 8px 0;">[NO PORTS DETECTED]</div>';
+                    return;
+                }
+
+                ports.sort((a, b) => {
+                    const numA = parseInt(a.name.replace(/\D/g, '')) || 0;
+                    const numB = parseInt(b.name.replace(/\D/g, '')) || 0;
+                    return numA - numB;
+                });
+
+                ports.forEach(status => {
+                    if (!sessions[status.name]) {
+                        if (Object.keys(sessions).length === 0) tabsContainer.innerHTML = '';
+                        createSession(status);
+                    }
+                    updateSession(sessions[status.name], status);
+                });
+
+                if (!activePort && ports.length > 0) {
+                    selectTab(ports[0].name);
+                }
+            } catch (error) {
+                console.error('Failed to fetch ports:', error);
+                if (Object.keys(sessions).length === 0) {
+                    tabsContainer.innerHTML = '<div style="font-family: var(--font-mono); font-size: 12px; color: var(--accent); padding: 8px 0;">[ERROR FETCHING PORTS]</div>';
+                }
+            } finally {
+                refreshing = false;
+            }
+        }
+
+        function createSession(status) {
+            const portName = status.name;
+            // Tab Element
+            const tabEl = document.createElement('button');
+            tabEl.className = 'tab';
+
+            const indicatorEl = document.createElement('div');
+            indicatorEl.className = 'status-indicator';
+
+            const labelEl = document.createElement('span');
+            labelEl.innerText = portName;
+
+            tabEl.appendChild(indicatorEl);
+            tabEl.appendChild(labelEl);
+
+            tabEl.onclick = () => selectTab(portName);
+            tabsContainer.appendChild(tabEl);
+
+            // Terminal Container
+            const containerEl = document.createElement('div');
+            containerEl.className = 'terminal-container';
+            terminalsWrapper.appendChild(containerEl);
+
+            // Initialize xterm.js
+            const term = new Terminal({
+                cursorBlink: true,
+                fontFamily: 'Cascadia Mono, Consolas, Courier New, monospace',
+                fontSize: 14,
+                lineHeight: 1.2,
+                theme: {
+                    background: '#111111',
+                    foreground: '#E8E8E8',
+                    cursor: '#E8E8E8',
+                    selection: 'rgba(232, 232, 232, 0.3)'
+                }
+            });
+            term.open(containerEl);
+
+            const session = {
+                portName,
+                tab: tabEl,
+                indicator: indicatorEl,
+                container: containerEl,
+                term,
+                socket: null,
+                tcpAddress: status.tcp_address,
+                connected: false
+            };
+
+            term.onData(data => {
+                if (session.socket && session.socket.readyState === WebSocket.OPEN) {
+                    session.socket.send(data);
+                }
+            });
+
+            sessions[portName] = session;
+        }
+
+        function connectSession(session) {
+            if (session.socket && (session.socket.readyState === WebSocket.OPEN || session.socket.readyState === WebSocket.CONNECTING)) return;
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws?port=${encodeURIComponent(session.portName)}`;
+            const socket = new WebSocket(wsUrl);
+            socket.binaryType = 'arraybuffer';
+            session.socket = socket;
+
+            socket.onopen = () => {
+                session.indicator.classList.add('connected');
+                session.term.writeln(`\x1b[32m[SYS] CONNECTED TO ${session.portName} · RAW TCP ${session.tcpAddress}\x1b[0m\r\n`);
+            };
+
+            socket.onmessage = (event) => {
+                if (event.data instanceof ArrayBuffer) {
+                    session.term.write(new Uint8Array(event.data));
+                } else {
+                    session.term.write(event.data);
+                }
+            };
+
+            socket.onclose = () => {
+                session.indicator.classList.remove('connected');
+                if (session.socket === socket) session.socket = null;
+                session.term.writeln(`\x1b[31m\r\n[SYS] DISCONNECTED FROM ${session.portName}\x1b[0m`);
+            };
+
+            socket.onerror = (error) => {
+                console.error(`WebSocket error on ${session.portName}`, error);
+            };
+        }
+
+        function updateSession(session, status) {
+            session.tcpAddress = status.tcp_address;
+            session.connected = status.connected;
+            session.tab.title = `Serial ${status.name} @ ${status.baud_rate} ${status.data_bits}${status.parity}${status.stop_bits} · SecureCRT Raw ${status.tcp_address}`;
+            if (status.connected) {
+                connectSession(session);
+            } else {
+                session.indicator.classList.remove('connected');
+                if (session.socket) {
+                    const socket = session.socket;
+                    session.socket = null;
+                    socket.close();
+                }
+            }
+        }
+
+        function selectTab(portName) {
+            Object.values(sessions).forEach(s => {
+                s.tab.classList.remove('active');
+                s.container.classList.remove('active');
+            });
+
+            const session = sessions[portName];
+            if (session) {
+                session.tab.classList.add('active');
+                session.container.classList.add('active');
+                session.term.focus();
+                activePort = portName;
+            }
+        }
+
+        refreshPorts();
+        setInterval(refreshPorts, 2000);
+    </script>
+</body>
+</html>
