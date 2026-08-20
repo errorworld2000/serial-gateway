@@ -34,6 +34,8 @@
             font-family: var(--font-body);
             margin: 0;
             height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
 
@@ -43,10 +45,10 @@
         }
 
         header {
-            padding: 48px 48px 16px 48px;
+            padding: 20px 24px 8px;
             display: flex;
             flex-direction: column;
-            gap: 32px;
+            gap: 12px;
         }
 
         .title-row {
@@ -85,7 +87,7 @@
 
         h1 {
             font-family: var(--font-display);
-            font-size: 36px;
+            font-size: 28px;
             font-weight: 600;
             color: var(--text-display);
             margin: 0;
@@ -141,18 +143,21 @@
 
         .terminal-containers {
             flex-grow: 1;
+            min-height: 0;
             background-color: var(--surface);
             border: 1px solid var(--border-visible);
             border-top: none;
-            margin: 0 48px 48px 48px;
+            margin: 0 24px 24px;
             position: relative;
         }
 
         .terminal-container {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            padding: 16px;
+            box-sizing: border-box;
+            padding: 10px;
             display: none;
+            overflow: hidden;
         }
 
         .terminal-container.active {
@@ -297,8 +302,9 @@
         .settings-message.error { color: var(--accent); }
 
         @media (max-width: 700px) {
-            header { padding: 24px 24px 12px; }
-            .terminal-containers { margin: 0 24px 24px; }
+            header { padding: 12px 12px 6px; }
+            h1 { font-size: 22px; }
+            .terminal-containers { margin: 0 12px 12px; }
             .settings-grid { grid-template-columns: 1fr; }
             .field.full { grid-column: auto; }
         }
@@ -408,6 +414,33 @@
         let settingsConfig = null;
 
         let refreshing = false;
+
+        function fitTerminal(session) {
+            if (!session || !session.container.classList.contains('active')) return;
+
+            const dimensions = session.term._core?._renderService?.dimensions?.css?.cell;
+            let cellWidth = dimensions?.width || 0;
+            let cellHeight = dimensions?.height || 0;
+            if (!cellWidth || !cellHeight) {
+                const screen = session.term.element?.querySelector('.xterm-screen');
+                const bounds = screen?.getBoundingClientRect();
+                cellWidth = bounds?.width / session.term.cols || 0;
+                cellHeight = bounds?.height / session.term.rows || 0;
+            }
+            if (!cellWidth || !cellHeight) return;
+
+            const style = getComputedStyle(session.container);
+            const availableWidth = session.container.clientWidth
+                - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+            const availableHeight = session.container.clientHeight
+                - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+            const cols = Math.max(2, Math.floor(availableWidth / cellWidth));
+            const rows = Math.max(1, Math.floor(availableHeight / cellHeight));
+
+            if (cols !== session.term.cols || rows !== session.term.rows) {
+                session.term.resize(cols, rows);
+            }
+        }
 
         function setSettingsMessage(message, type = '') {
             settingsMessage.textContent = message;
@@ -612,6 +645,9 @@
                 connected: false
             };
 
+            session.resizeObserver = new ResizeObserver(() => fitTerminal(session));
+            session.resizeObserver.observe(containerEl);
+
             term.onData(data => {
                 if (session.socket && session.socket.readyState === WebSocket.OPEN) {
                     session.socket.send(data);
@@ -679,10 +715,17 @@
             if (session) {
                 session.tab.classList.add('active');
                 session.container.classList.add('active');
-                session.term.focus();
                 activePort = portName;
+                requestAnimationFrame(() => {
+                    fitTerminal(session);
+                    session.term.focus();
+                });
             }
         }
+
+        window.addEventListener('resize', () => {
+            if (activePort) fitTerminal(sessions[activePort]);
+        });
 
         refreshPorts();
         setInterval(refreshPorts, 2000);
