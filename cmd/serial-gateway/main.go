@@ -61,6 +61,7 @@ func main() {
 	app := gateway.NewApp(settings, runtimeConfig.TCP.Host, runtimeConfig.TCP.BasePort, opener)
 	app.SetBuildInfo(gateway.BuildInfo{Version: version, Commit: commit, BuildDate: buildDate})
 	app.SetTCPInputOptions(gateway.TCPInputOptions{EscapeDelay: runtimeConfig.EscapeDelay(), NormalizeCRLF: runtimeConfig.TCP.NormalizeCRLF})
+	app.SetTelnetOptions(gateway.TelnetOptions{Enabled: runtimeConfig.Telnet.Enabled, Host: runtimeConfig.Telnet.Host, BasePort: runtimeConfig.Telnet.BasePort})
 	app.SetAllowedPorts(runtimeConfig.Serial.Ports)
 	ports, err := serial.GetPortsList()
 	if err != nil {

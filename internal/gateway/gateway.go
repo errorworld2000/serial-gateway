@@ -82,6 +82,9 @@ type GatewayStatus struct {
 	TCPAddress       string `json:"tcp_address"`
 	TCPListening     bool   `json:"tcp_listening"`
 	TCPClients       int    `json:"tcp_clients"`
+	TelnetAddress    string `json:"telnet_address,omitempty"`
+	TelnetListening  bool   `json:"telnet_listening"`
+	TelnetClients    int    `json:"telnet_clients"`
 	WebSocketClients int    `json:"websocket_clients"`
 	LatestSequence   uint64 `json:"latest_sequence"`
 	TCPEscapeDelayMS int64  `json:"tcp_escape_delay_ms"`
@@ -112,10 +115,13 @@ type SerialGateway struct {
 	sequence     atomic.Uint64
 	notify       chan struct{}
 
-	listenerMu sync.Mutex
-	listener   net.Listener
-	closed     atomic.Bool
-	tcpInput   TCPInputOptions
+	listenerMu       sync.Mutex
+	listener         net.Listener
+	telnetAddress    string
+	telnetListenerMu sync.Mutex
+	telnetListener   net.Listener
+	closed           atomic.Bool
+	tcpInput         TCPInputOptions
 }
 
 func NewSerialGateway(name string, settings SerialSettings, tcpHost string, tcpPort int) *SerialGateway {
@@ -128,8 +134,13 @@ func NewSerialGateway(name string, settings SerialSettings, tcpHost string, tcpP
 	}
 }
 
-func (g *SerialGateway) Name() string       { return g.name }
-func (g *SerialGateway) TCPAddress() string { return g.tcpAddress }
+func (g *SerialGateway) Name() string          { return g.name }
+func (g *SerialGateway) TCPAddress() string    { return g.tcpAddress }
+func (g *SerialGateway) TelnetAddress() string { return g.telnetAddress }
+
+func (g *SerialGateway) SetTelnetAddress(host string, port int) {
+	g.telnetAddress = net.JoinHostPort(host, fmt.Sprintf("%d", port))
+}
 
 func (g *SerialGateway) SetTCPInputOptions(options TCPInputOptions) {
 	g.tcpInput = options
@@ -362,6 +373,7 @@ func (g *SerialGateway) Status() GatewayStatus {
 		StopBits:         g.serial.StopBits,
 		Connected:        g.Connected(),
 		TCPAddress:       g.tcpAddress,
+		TelnetAddress:    g.telnetAddress,
 		LatestSequence:   g.sequence.Load(),
 		TCPEscapeDelayMS: g.tcpInput.EscapeDelay.Milliseconds(),
 		TCPNormalizeCRLF: g.tcpInput.NormalizeCRLF,
@@ -369,11 +381,16 @@ func (g *SerialGateway) Status() GatewayStatus {
 	g.listenerMu.Lock()
 	status.TCPListening = g.listener != nil
 	g.listenerMu.Unlock()
+	g.telnetListenerMu.Lock()
+	status.TelnetListening = g.telnetListener != nil
+	g.telnetListenerMu.Unlock()
 	g.subscribersMu.RLock()
 	for subscriber := range g.subscribers {
 		switch subscriber.kind {
 		case "tcp":
 			status.TCPClients++
+		case "telnet":
+			status.TelnetClients++
 		case "websocket":
 			status.WebSocketClients++
 		}
@@ -553,6 +570,13 @@ func (g *SerialGateway) Close() {
 	g.listenerMu.Unlock()
 	if listener != nil {
 		_ = listener.Close()
+	}
+	g.telnetListenerMu.Lock()
+	telnetListener := g.telnetListener
+	g.telnetListener = nil
+	g.telnetListenerMu.Unlock()
+	if telnetListener != nil {
+		_ = telnetListener.Close()
 	}
 	g.Detach()
 	g.subscribersMu.RLock()

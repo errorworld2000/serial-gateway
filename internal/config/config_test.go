@@ -24,10 +24,28 @@ func TestLoadOrCreate(t *testing.T) {
 	if !strings.Contains(string(data), `"normalize_crlf": true`) {
 		t.Fatalf("generated config missing terminal option: %s", data)
 	}
+	if !strings.Contains(string(data), `"base_port": 8000`) {
+		t.Fatalf("generated config missing Telnet option: %s", data)
+	}
 
 	loaded, created, err := LoadOrCreate(path)
 	if err != nil || created || !reflect.DeepEqual(loaded, value) {
 		t.Fatalf("reload config: created=%v value=%#v err=%v", created, loaded, err)
+	}
+}
+
+func TestLoadLegacyConfigAddsTelnetDefaults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	legacy := `{"serial":{"ports":["COM13"],"baud_rate":115200,"data_bits":8,"parity":"none","stop_bits":"1"},"http":{"address":"127.0.0.1:8080"},"tcp":{"host":"127.0.0.1","base_port":7000,"escape_delay_ms":5,"normalize_crlf":true},"scan_interval_ms":2000}`
+	if err := os.WriteFile(path, []byte(legacy), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	loaded, created, err := LoadOrCreate(path)
+	if err != nil || created {
+		t.Fatalf("load legacy config: created=%v err=%v", created, err)
+	}
+	if !loaded.Telnet.Enabled || loaded.Telnet.Host != "127.0.0.1" || loaded.Telnet.BasePort != 8000 {
+		t.Fatalf("legacy Telnet defaults = %#v", loaded.Telnet)
 	}
 }
 

@@ -3,7 +3,8 @@
 一个面向本机调试的串口网关。程序只打开串口一次，并同时提供：
 
 - 浏览器 xterm.js 终端；
-- SecureCRT 可连接的字节透明 Raw TCP；
+- SecureCRT 可直接连接的 Telnet 终端；
+- 面向二进制工具的字节透明 Raw TCP；
 - 适合脚本和 AI 调试的游标式 HTTP API。
 
 Web UI 与 xterm.js 已嵌入，编译后的 `serial-gateway.exe` 是单文件程序。
@@ -15,7 +16,7 @@ serial-gateway/
 ├── build/                    EXE 和运行时配置（构建生成）
 ├── cmd/serial-gateway/       入口、配置加载、进程生命周期
 ├── internal/config/          JSON 配置生成、加载和校验
-├── internal/gateway/         串口、Raw TCP、WebSocket、HTTP API
+├── internal/gateway/         串口、Telnet、Raw TCP、WebSocket、HTTP API
 ├── internal/webui/           嵌入式前端和本地 xterm.js
 ├── scripts/build.ps1         测试、静态检查、版本注入、构建
 ├── go.mod
@@ -39,7 +40,7 @@ serial-gateway/
 build/serial-gateway.json
 ```
 
-程序随后直接使用默认配置运行。通常不需要手动编辑 JSON：打开 Web UI，点击右上角 **PORT SETTINGS** 即可选择启用的串口并修改串口、Web/API 和 Raw TCP 参数。端口选择会立即生效；其他参数保存后按页面提示重启程序生效。
+程序随后直接使用默认配置运行。通常不需要手动编辑 JSON：打开 Web UI，点击右上角 **PORT SETTINGS** 即可选择启用的串口并修改串口、Web/API、Telnet 和 Raw TCP 参数。端口选择会立即生效；其他参数保存后按页面提示重启程序生效。
 
 JSON 仍可用于脚本化部署或离线修改：
 
@@ -61,6 +62,11 @@ JSON 仍可用于脚本化部署或离线修改：
     "escape_delay_ms": 5,
     "normalize_crlf": true
   },
+  "telnet": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "base_port": 8000
+  },
   "scan_interval_ms": 2000
 }
 ```
@@ -72,14 +78,16 @@ JSON 仍可用于脚本化部署或离线修改：
 ## SecureCRT
 
 1. 启动网关并查询 `GET /api/v1/ports`。
-2. 在 SecureCRT 新建会话，Protocol 选择 **Raw**，不能选择 Telnet。
-3. Hostname 使用 `127.0.0.1`，Port 使用对应的 `tcp_address`。
+2. 在 SecureCRT 新建会话，Protocol 选择 **Telnet**。
+3. Hostname 使用 `127.0.0.1`，Port 使用对应的 `telnet_address`。
 
-Windows COM 端口采用稳定映射：`COMn → tcp-base + n`。默认情况下，`COM3` 对应 `127.0.0.1:7003`。其他平台的设备名按发现顺序分配端口；进程运行期间拔插不会改变映射。
+Windows COM 端口采用稳定映射：`COMn → base-port + n`。默认情况下，COM3 的 Telnet 地址为 `127.0.0.1:8003`，Raw TCP 地址为 `127.0.0.1:7003`；COM13 则分别是 `8013` 和 `7013`。其他平台的设备名按发现顺序分配端口；进程运行期间拔插不会改变映射。
 
-TCP 双向传输任意原始字节。串口参数由 `serial-gateway.json` 决定，SecureCRT Raw 会话中的串口选项不生效。多个客户端可以同时观察一个串口，其发送数据按到达顺序串行写入。
+Telnet 入口会协商服务器回显、逐键交互、二进制传输、终端类型和窗口大小，适合 SecureCRT 的方向键、Tab 补全和命令行编辑。串口参数仍由 `serial-gateway.json` 决定。多个客户端可以同时观察一个串口，其发送数据按到达顺序串行写入。
 
-Raw TCP 不携带 Break、DTR、RTS 等串口带外控制信号。
+Raw TCP 保留给需要字节透明传输的脚本和协议工具，地址见 `tcp_address`。
+
+Telnet 和 Raw TCP 都不携带 Break、DTR、RTS 等串口带外控制信号。
 
 默认启用交互终端兼容：连续方向键等 ESC 序列之间加入 5 ms 间隔，并把 CRLF 规范化为 CR。严格二进制透明场景把 `tcp.escape_delay_ms` 改为 `0`，并将 `tcp.normalize_crlf` 改为 `false`。
 

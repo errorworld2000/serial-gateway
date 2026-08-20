@@ -19,6 +19,7 @@ type Config struct {
 	Serial         SerialConfig `json:"serial"`
 	HTTP           HTTPConfig   `json:"http"`
 	TCP            TCPConfig    `json:"tcp"`
+	Telnet         TelnetConfig `json:"telnet"`
 	ScanIntervalMS int          `json:"scan_interval_ms"`
 }
 
@@ -41,6 +42,12 @@ type TCPConfig struct {
 	NormalizeCRLF bool   `json:"normalize_crlf"`
 }
 
+type TelnetConfig struct {
+	Enabled  bool   `json:"enabled"`
+	Host     string `json:"host"`
+	BasePort int    `json:"base_port"`
+}
+
 func Default() Config {
 	return Config{
 		Serial: SerialConfig{
@@ -56,6 +63,11 @@ func Default() Config {
 			BasePort:      7000,
 			EscapeDelayMS: 5,
 			NormalizeCRLF: true,
+		},
+		Telnet: TelnetConfig{
+			Enabled:  true,
+			Host:     "127.0.0.1",
+			BasePort: 8000,
 		},
 		ScanIntervalMS: 2000,
 	}
@@ -90,7 +102,7 @@ func LoadOrCreate(path string) (Config, bool, error) {
 		return Config{}, false, fmt.Errorf("read configuration %s: %w", path, err)
 	}
 
-	var value Config
+	value := Default()
 	decoder := json.NewDecoder(strings.NewReader(string(data)))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&value); err != nil {
@@ -165,6 +177,12 @@ func (c Config) Validate() error {
 	}
 	if c.TCP.EscapeDelayMS < 0 {
 		return errors.New("tcp.escape_delay_ms must not be negative")
+	}
+	if strings.TrimSpace(c.Telnet.Host) == "" {
+		return errors.New("telnet.host must not be empty")
+	}
+	if c.Telnet.BasePort < 1 || c.Telnet.BasePort > 65535 {
+		return errors.New("telnet.base_port must be between 1 and 65535")
 	}
 	if c.ScanIntervalMS <= 0 {
 		return errors.New("scan_interval_ms must be positive")

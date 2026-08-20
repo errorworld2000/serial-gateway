@@ -71,7 +71,8 @@ func (a *App) HandlePortStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ports": statuses,
 		"usage": map[string]string{
-			"securecrt": "Create a session using the Raw protocol and the port's tcp_address",
+			"securecrt": "Create a Telnet session using the port's telnet_address",
+			"raw":       "Use tcp_address for byte-transparent TCP tools",
 			"read":      "GET /api/v1/read?port=COM3&after=0&wait_ms=30000&encoding=hex",
 			"write":     "POST /api/v1/write?port=COM3 with JSON {\"encoding\":\"text|hex|base64\",\"data\":\"...\"}",
 		},

@@ -379,6 +379,18 @@
                             <label for="settings-tcp-base">TCP base port</label>
                             <input id="settings-tcp-base" type="number" min="1" max="65535">
                         </div>
+                        <label class="checkbox-label field full">
+                            <input id="settings-telnet-enabled" type="checkbox">
+                            Enable SecureCRT Telnet endpoints
+                        </label>
+                        <div class="field">
+                            <label for="settings-telnet-host">Telnet host</label>
+                            <input id="settings-telnet-host" type="text">
+                        </div>
+                        <div class="field">
+                            <label for="settings-telnet-base">Telnet base port</label>
+                            <input id="settings-telnet-base" type="number" min="1" max="65535">
+                        </div>
                         <div class="field">
                             <label for="settings-escape-delay">Escape delay (ms)</label>
                             <input id="settings-escape-delay" type="number" min="0">
@@ -502,6 +514,9 @@
             document.getElementById('settings-http-address').value = config.http.address;
             document.getElementById('settings-tcp-host').value = config.tcp.host;
             document.getElementById('settings-tcp-base').value = config.tcp.base_port;
+			document.getElementById('settings-telnet-enabled').checked = config.telnet.enabled;
+			document.getElementById('settings-telnet-host').value = config.telnet.host;
+			document.getElementById('settings-telnet-base').value = config.telnet.base_port;
             document.getElementById('settings-escape-delay').value = config.tcp.escape_delay_ms;
             document.getElementById('settings-normalize-crlf').checked = config.tcp.normalize_crlf;
             document.getElementById('settings-scan-interval').value = config.scan_interval_ms;
@@ -534,6 +549,9 @@
             updated.tcp.base_port = Number(document.getElementById('settings-tcp-base').value);
             updated.tcp.escape_delay_ms = Number(document.getElementById('settings-escape-delay').value);
             updated.tcp.normalize_crlf = document.getElementById('settings-normalize-crlf').checked;
+			updated.telnet.enabled = document.getElementById('settings-telnet-enabled').checked;
+			updated.telnet.host = document.getElementById('settings-telnet-host').value.trim();
+			updated.telnet.base_port = Number(document.getElementById('settings-telnet-base').value);
             updated.scan_interval_ms = Number(document.getElementById('settings-scan-interval').value);
             setSettingsMessage('Saving settings...');
             try {
@@ -691,8 +709,9 @@
 
         function updateSession(session, status) {
             session.tcpAddress = status.tcp_address;
+			session.telnetAddress = status.telnet_address;
             session.connected = status.connected;
-            session.tab.title = `Serial ${status.name} @ ${status.baud_rate} ${status.data_bits}${status.parity}${status.stop_bits} · SecureCRT Raw ${status.tcp_address}`;
+			session.tab.title = `Serial ${status.name} @ ${status.baud_rate} ${status.data_bits}${status.parity}${status.stop_bits} · SecureCRT Telnet ${status.telnet_address || 'disabled'} · Raw ${status.tcp_address}`;
             if (status.connected) {
                 connectSession(session);
             } else {

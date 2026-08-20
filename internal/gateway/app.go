@@ -20,18 +20,27 @@ var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { retu
 type SerialOpener func(name string) (io.ReadWriteCloser, error)
 
 type App struct {
-	mu          sync.RWMutex
-	gateways    map[string]*SerialGateway
-	serial      SerialSettings
-	tcpHost     string
-	tcpBase     int
-	nextTCPPort int
-	usedTCPPort map[int]bool
-	openSerial  SerialOpener
-	build       BuildInfo
-	allowed     map[string]bool
-	tcpInput    TCPInputOptions
-	detected    []string
+	mu             sync.RWMutex
+	gateways       map[string]*SerialGateway
+	serial         SerialSettings
+	tcpHost        string
+	tcpBase        int
+	nextTCPPort    int
+	usedTCPPort    map[int]bool
+	telnet         TelnetOptions
+	nextTelnetPort int
+	usedTelnetPort map[int]bool
+	openSerial     SerialOpener
+	build          BuildInfo
+	allowed        map[string]bool
+	tcpInput       TCPInputOptions
+	detected       []string
+}
+
+type TelnetOptions struct {
+	Enabled  bool
+	Host     string
+	BasePort int
 }
 
 func (a *App) SetAllowedPorts(names []string) {
@@ -49,6 +58,13 @@ func (a *App) SetAllowedPorts(names []string) {
 func (a *App) SetTCPInputOptions(options TCPInputOptions) {
 	a.mu.Lock()
 	a.tcpInput = options
+	a.mu.Unlock()
+}
+
+func (a *App) SetTelnetOptions(options TelnetOptions) {
+	a.mu.Lock()
+	a.telnet = options
+	a.nextTelnetPort = options.BasePort
 	a.mu.Unlock()
 }
 
@@ -70,14 +86,15 @@ func (a *App) ApplyAllowedPorts(names []string) error {
 
 func NewApp(settings SerialSettings, tcpHost string, tcpBase int, opener SerialOpener) *App {
 	return &App{
-		gateways:    make(map[string]*SerialGateway),
-		serial:      settings,
-		tcpHost:     tcpHost,
-		tcpBase:     tcpBase,
-		nextTCPPort: tcpBase,
-		usedTCPPort: make(map[int]bool),
-		openSerial:  opener,
-		build:       BuildInfo{Version: "dev", Commit: "unknown", BuildDate: "unknown"},
+		gateways:       make(map[string]*SerialGateway),
+		serial:         settings,
+		tcpHost:        tcpHost,
+		tcpBase:        tcpBase,
+		nextTCPPort:    tcpBase,
+		usedTCPPort:    make(map[int]bool),
+		usedTelnetPort: make(map[int]bool),
+		openSerial:     opener,
+		build:          BuildInfo{Version: "dev", Commit: "unknown", BuildDate: "unknown"},
 	}
 }
 
@@ -94,28 +111,36 @@ func (a *App) SetBuildInfo(info BuildInfo) {
 }
 
 func (a *App) allocateTCPPort(name string) int {
+	return allocateMappedPort(name, a.tcpBase, &a.nextTCPPort, a.usedTCPPort)
+}
+
+func (a *App) allocateTelnetPort(name string) int {
+	return allocateMappedPort(name, a.telnet.BasePort, &a.nextTelnetPort, a.usedTelnetPort)
+}
+
+func allocateMappedPort(name string, base int, next *int, used map[int]bool) int {
 	upperName := strings.ToUpper(name)
 	if strings.HasPrefix(upperName, "COM") {
 		if number, err := strconv.Atoi(strings.TrimPrefix(upperName, "COM")); err == nil {
-			candidate := a.tcpBase + number
-			if candidate <= 65535 && !a.usedTCPPort[candidate] {
-				a.usedTCPPort[candidate] = true
+			candidate := base + number
+			if candidate <= 65535 && !used[candidate] {
+				used[candidate] = true
 				return candidate
 			}
 		}
 	}
-	if a.nextTCPPort > 65535 {
-		a.nextTCPPort = 1024
+	if *next > 65535 {
+		*next = 1024
 	}
-	for a.usedTCPPort[a.nextTCPPort] {
-		a.nextTCPPort++
-		if a.nextTCPPort > 65535 {
-			a.nextTCPPort = 1024
+	for used[*next] {
+		*next++
+		if *next > 65535 {
+			*next = 1024
 		}
 	}
-	port := a.nextTCPPort
-	a.usedTCPPort[port] = true
-	a.nextTCPPort++
+	port := *next
+	used[port] = true
+	*next++
 	return port
 }
 
@@ -156,13 +181,21 @@ func (a *App) Reconcile(portNames []string) {
 			a.mu.Lock()
 			tcpPort := a.allocateTCPPort(name)
 			gateway = NewSerialGateway(name, a.serial, a.tcpHost, tcpPort)
+			if a.telnet.Enabled {
+				gateway.SetTelnetAddress(a.telnet.Host, a.allocateTelnetPort(name))
+			}
 			gateway.SetTCPInputOptions(a.tcpInput)
 			a.gateways[name] = gateway
 			a.mu.Unlock()
-			log.Printf("Discovered serial port %s (SecureCRT Raw TCP: %s)", name, gateway.TCPAddress())
+			log.Printf("Discovered serial port %s (Raw TCP: %s, SecureCRT Telnet: %s)", name, gateway.TCPAddress(), gateway.TelnetAddress())
 		}
 		if err := gateway.EnsureTCP(); err != nil {
 			log.Printf("TCP listener for %s: %v", name, err)
+		}
+		if gateway.TelnetAddress() != "" {
+			if err := gateway.EnsureTelnet(); err != nil {
+				log.Printf("Telnet listener for %s: %v", name, err)
+			}
 		}
 		if !gateway.Connected() {
 			port, err := a.openSerial(name)

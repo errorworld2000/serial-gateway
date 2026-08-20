@@ -66,6 +66,7 @@ var testSerialSettings = SerialSettings{BaudRate: 115200, DataBits: 8, Parity: "
 
 func TestStableCOMTCPMapping(t *testing.T) {
 	app := NewApp(testSerialSettings, "127.0.0.1", 7000, nil)
+	app.SetTelnetOptions(TelnetOptions{Enabled: true, Host: "127.0.0.1", BasePort: 8000})
 	if port := app.allocateTCPPort("COM3"); port != 7003 {
 		t.Fatalf("COM3 mapped to %d, want 7003", port)
 	}
@@ -74,6 +75,9 @@ func TestStableCOMTCPMapping(t *testing.T) {
 	}
 	if port := app.allocateTCPPort("/dev/ttyUSB0"); port != 7000 {
 		t.Fatalf("non-COM port mapped to %d, want 7000", port)
+	}
+	if port := app.allocateTelnetPort("COM13"); port != 8013 {
+		t.Fatalf("COM13 Telnet mapped to %d, want 8013", port)
 	}
 }
 
