@@ -1,5 +1,6 @@
 /serial-gateway.exe
 *.exe~
 /dist/
+/build/
 *.log
 *.tmp

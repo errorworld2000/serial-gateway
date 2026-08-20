@@ -49,6 +49,40 @@
             gap: 32px;
         }
 
+        .title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        .settings-button,
+        .action-button {
+            border: 1px solid var(--border-visible);
+            background: var(--surface-raised);
+            color: var(--text-primary);
+            padding: 9px 14px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .settings-button:hover,
+        .action-button:hover {
+            border-color: var(--text-secondary);
+            color: var(--text-display);
+        }
+
+        .action-button.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
         h1 {
             font-family: var(--font-display);
             font-size: 36px;
@@ -139,11 +173,144 @@
             background: var(--text-disabled);
         }
 
+        .settings-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.78);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .settings-overlay.hidden {
+            display: none;
+        }
+
+        .settings-panel {
+            width: min(760px, 100%);
+            max-height: calc(100vh - 48px);
+            overflow: auto;
+            background: var(--surface);
+            border: 1px solid var(--border-visible);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+        }
+
+        .settings-header,
+        .settings-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-visible);
+        }
+
+        .settings-actions {
+            justify-content: flex-end;
+            gap: 10px;
+            border-top: 1px solid var(--border-visible);
+            border-bottom: none;
+        }
+
+        .settings-header h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .settings-content {
+            padding: 24px;
+        }
+
+        .settings-section {
+            margin-bottom: 28px;
+        }
+
+        .settings-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .settings-section h3 {
+            margin: 0 0 14px;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .field.full {
+            grid-column: 1 / -1;
+        }
+
+        .field label,
+        .checkbox-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .field input,
+        .field select {
+            box-sizing: border-box;
+            width: 100%;
+            border: 1px solid var(--border-visible);
+            background: var(--black);
+            color: var(--text-primary);
+            padding: 9px 10px;
+            font-family: var(--font-mono);
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .port-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            margin-top: 14px;
+        }
+
+        .settings-message {
+            min-height: 20px;
+            padding: 0 24px 16px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .settings-message.success { color: var(--success); }
+        .settings-message.error { color: var(--accent); }
+
+        @media (max-width: 700px) {
+            header { padding: 24px 24px 12px; }
+            .terminal-containers { margin: 0 24px 24px; }
+            .settings-grid { grid-template-columns: 1fr; }
+            .field.full { grid-column: auto; }
+        }
+
     </style>
 </head>
 <body>
     <header>
-        <h1>Serial Gateway</h1>
+        <div class="title-row">
+            <h1>Serial Gateway</h1>
+            <button class="settings-button" id="settings-open" type="button">PORT SETTINGS</button>
+        </div>
         <div class="tabs" id="tabs-container">
             <!-- Tabs will be dynamically added here -->
         </div>
@@ -153,14 +320,211 @@
         <!-- Terminal divs will be dynamically added here -->
     </div>
 
+    <div class="settings-overlay hidden" id="settings-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="settings-panel">
+            <div class="settings-header">
+                <h2 id="settings-title">Port settings</h2>
+                <button class="action-button" id="settings-close" type="button">CLOSE</button>
+            </div>
+            <div class="settings-content">
+                <section class="settings-section">
+                    <h3>Serial ports</h3>
+                    <label class="checkbox-label">
+                        <input id="settings-all-ports" type="checkbox">
+                        Automatically enable every detected port
+                    </label>
+                    <div class="port-list" id="settings-port-list"></div>
+                </section>
+
+                <section class="settings-section">
+                    <h3>Serial format</h3>
+                    <div class="settings-grid">
+                        <div class="field">
+                            <label for="settings-baud">Baud rate</label>
+                            <input id="settings-baud" type="number" min="1">
+                        </div>
+                        <div class="field">
+                            <label for="settings-data-bits">Data bits</label>
+                            <select id="settings-data-bits"><option>5</option><option>6</option><option>7</option><option>8</option></select>
+                        </div>
+                        <div class="field">
+                            <label for="settings-parity">Parity</label>
+                            <select id="settings-parity"><option value="none">None</option><option value="odd">Odd</option><option value="even">Even</option><option value="mark">Mark</option><option value="space">Space</option></select>
+                        </div>
+                        <div class="field">
+                            <label for="settings-stop-bits">Stop bits</label>
+                            <select id="settings-stop-bits"><option value="1">1</option><option value="1.5">1.5</option><option value="2">2</option></select>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="settings-section">
+                    <h3>Network and terminal</h3>
+                    <div class="settings-grid">
+                        <div class="field full">
+                            <label for="settings-http-address">Web/API address</label>
+                            <input id="settings-http-address" type="text">
+                        </div>
+                        <div class="field">
+                            <label for="settings-tcp-host">Raw TCP host</label>
+                            <input id="settings-tcp-host" type="text">
+                        </div>
+                        <div class="field">
+                            <label for="settings-tcp-base">TCP base port</label>
+                            <input id="settings-tcp-base" type="number" min="1" max="65535">
+                        </div>
+                        <div class="field">
+                            <label for="settings-escape-delay">Escape delay (ms)</label>
+                            <input id="settings-escape-delay" type="number" min="0">
+                        </div>
+                        <div class="field">
+                            <label for="settings-scan-interval">Scan interval (ms)</label>
+                            <input id="settings-scan-interval" type="number" min="1">
+                        </div>
+                        <label class="checkbox-label field full">
+                            <input id="settings-normalize-crlf" type="checkbox">
+                            Convert CRLF input to CR for interactive serial consoles
+                        </label>
+                    </div>
+                </section>
+            </div>
+            <div class="settings-message" id="settings-message"></div>
+            <div class="settings-actions">
+                <button class="action-button" id="settings-cancel" type="button">CANCEL</button>
+                <button class="action-button primary" id="settings-save" type="button">SAVE SETTINGS</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const tabsContainer = document.getElementById('tabs-container');
         const terminalsWrapper = document.getElementById('terminals-wrapper');
+        const settingsOverlay = document.getElementById('settings-overlay');
+        const settingsMessage = document.getElementById('settings-message');
+        const settingsPortList = document.getElementById('settings-port-list');
 
         const sessions = {};
         let activePort = null;
+        let settingsConfig = null;
 
         let refreshing = false;
+
+        function setSettingsMessage(message, type = '') {
+            settingsMessage.textContent = message;
+            settingsMessage.className = `settings-message ${type}`;
+        }
+
+        function setSettingsOpen(open) {
+            settingsOverlay.classList.toggle('hidden', !open);
+            if (!open) setSettingsMessage('');
+        }
+
+        function naturalPortSort(a, b) {
+            const numA = parseInt(a.replace(/\D/g, '')) || 0;
+            const numB = parseInt(b.replace(/\D/g, '')) || 0;
+            return numA - numB || a.localeCompare(b);
+        }
+
+        async function openSettings() {
+            setSettingsOpen(true);
+            setSettingsMessage('Loading settings...');
+            try {
+                const response = await fetch('/api/v1/config');
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+                settingsConfig = payload.config;
+                populateSettings(settingsConfig, payload.detected_ports || []);
+                setSettingsMessage('');
+            } catch (error) {
+                setSettingsMessage(`Failed to load settings: ${error.message}`, 'error');
+            }
+        }
+
+        function populateSettings(config, detectedPorts) {
+            const configuredPorts = config.serial.ports || [];
+            const allPorts = configuredPorts.length === 0;
+            const portNames = [...new Set([...detectedPorts, ...configuredPorts])].sort(naturalPortSort);
+            document.getElementById('settings-all-ports').checked = allPorts;
+            settingsPortList.innerHTML = '';
+            if (portNames.length === 0) {
+                settingsPortList.textContent = 'No serial ports detected.';
+            }
+            portNames.forEach(portName => {
+                const label = document.createElement('label');
+                label.className = 'checkbox-label';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = portName;
+                checkbox.checked = allPorts || configuredPorts.includes(portName);
+                checkbox.disabled = allPorts;
+                checkbox.dataset.port = 'true';
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(portName));
+                settingsPortList.appendChild(label);
+            });
+            document.getElementById('settings-baud').value = config.serial.baud_rate;
+            document.getElementById('settings-data-bits').value = config.serial.data_bits;
+            document.getElementById('settings-parity').value = config.serial.parity;
+            document.getElementById('settings-stop-bits').value = config.serial.stop_bits;
+            document.getElementById('settings-http-address').value = config.http.address;
+            document.getElementById('settings-tcp-host').value = config.tcp.host;
+            document.getElementById('settings-tcp-base').value = config.tcp.base_port;
+            document.getElementById('settings-escape-delay').value = config.tcp.escape_delay_ms;
+            document.getElementById('settings-normalize-crlf').checked = config.tcp.normalize_crlf;
+            document.getElementById('settings-scan-interval').value = config.scan_interval_ms;
+        }
+
+        function toggleAllPorts() {
+            const allPorts = document.getElementById('settings-all-ports').checked;
+            settingsPortList.querySelectorAll('input[data-port]').forEach(checkbox => {
+                checkbox.disabled = allPorts;
+                if (allPorts) checkbox.checked = true;
+            });
+        }
+
+        async function saveSettings() {
+            if (!settingsConfig) return;
+            const allPorts = document.getElementById('settings-all-ports').checked;
+            const selectedPorts = [...settingsPortList.querySelectorAll('input[data-port]:checked')].map(input => input.value);
+            if (!allPorts && selectedPorts.length === 0) {
+                setSettingsMessage('Select at least one port, or enable all detected ports.', 'error');
+                return;
+            }
+            const updated = JSON.parse(JSON.stringify(settingsConfig));
+            updated.serial.ports = allPorts ? [] : selectedPorts;
+            updated.serial.baud_rate = Number(document.getElementById('settings-baud').value);
+            updated.serial.data_bits = Number(document.getElementById('settings-data-bits').value);
+            updated.serial.parity = document.getElementById('settings-parity').value;
+            updated.serial.stop_bits = document.getElementById('settings-stop-bits').value;
+            updated.http.address = document.getElementById('settings-http-address').value.trim();
+            updated.tcp.host = document.getElementById('settings-tcp-host').value.trim();
+            updated.tcp.base_port = Number(document.getElementById('settings-tcp-base').value);
+            updated.tcp.escape_delay_ms = Number(document.getElementById('settings-escape-delay').value);
+            updated.tcp.normalize_crlf = document.getElementById('settings-normalize-crlf').checked;
+            updated.scan_interval_ms = Number(document.getElementById('settings-scan-interval').value);
+            setSettingsMessage('Saving settings...');
+            try {
+                const response = await fetch('/api/v1/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updated)
+                });
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+                settingsConfig = payload.config;
+                populateSettings(settingsConfig, payload.detected_ports || []);
+                if (payload.apply_error) {
+                    setSettingsMessage(`Saved, but port refresh failed: ${payload.apply_error}`, 'error');
+                } else if (payload.restart_required) {
+                    setSettingsMessage('Saved. Restart Serial Gateway to apply non-port changes.', 'success');
+                } else {
+                    setSettingsMessage('Saved and applied.', 'success');
+                }
+                setTimeout(refreshPorts, 300);
+            } catch (error) {
+                setSettingsMessage(`Failed to save settings: ${error.message}`, 'error');
+            }
+        }
 
         async function refreshPorts() {
             if (refreshing) return;
@@ -176,11 +540,7 @@
                     return;
                 }
 
-                ports.sort((a, b) => {
-                    const numA = parseInt(a.name.replace(/\D/g, '')) || 0;
-                    const numB = parseInt(b.name.replace(/\D/g, '')) || 0;
-                    return numA - numB;
-                });
+                ports.sort((a, b) => naturalPortSort(a.name, b.name));
 
                 ports.forEach(status => {
                     if (!sessions[status.name]) {
@@ -326,6 +686,17 @@
 
         refreshPorts();
         setInterval(refreshPorts, 2000);
+        document.getElementById('settings-open').addEventListener('click', openSettings);
+        document.getElementById('settings-close').addEventListener('click', () => setSettingsOpen(false));
+        document.getElementById('settings-cancel').addEventListener('click', () => setSettingsOpen(false));
+        document.getElementById('settings-save').addEventListener('click', saveSettings);
+        document.getElementById('settings-all-ports').addEventListener('change', toggleAllPorts);
+        settingsOverlay.addEventListener('click', event => {
+            if (event.target === settingsOverlay) setSettingsOpen(false);
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !settingsOverlay.classList.contains('hidden')) setSettingsOpen(false);
+        });
     </script>
 </body>
 </html>

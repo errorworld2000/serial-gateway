@@ -142,6 +142,37 @@ func TestRXReadsAreCoalesced(t *testing.T) {
 	}
 }
 
+func TestSplitTerminalInput(t *testing.T) {
+	input := []byte("\r\n\x1b[A\x1b[Bls\r\n")
+	units := splitTerminalInput(input, true)
+	if len(units) != 4 {
+		t.Fatalf("got %d input units, want 4: %#v", len(units), units)
+	}
+	want := []struct {
+		data   string
+		escape bool
+	}{
+		{"\r", false},
+		{"\x1b[A", true},
+		{"\x1b[B", true},
+		{"ls\r", false},
+	}
+	for index := range want {
+		if string(units[index].data) != want[index].data || units[index].escape != want[index].escape {
+			t.Errorf("unit %d = {%q, %v}, want {%q, %v}", index, units[index].data, units[index].escape, want[index].data, want[index].escape)
+		}
+	}
+
+	strict := splitTerminalInput(input, false)
+	var reconstructed []byte
+	for _, unit := range strict {
+		reconstructed = append(reconstructed, unit.data...)
+	}
+	if !bytes.Equal(reconstructed, input) {
+		t.Fatalf("strict mode changed bytes: got %x, want %x", reconstructed, input)
+	}
+}
+
 func TestRawTCPBridge(t *testing.T) {
 	port := newFakeSerialPort()
 	gateway := NewSerialGateway("TEST2", testSerialSettings, "127.0.0.1", 0)

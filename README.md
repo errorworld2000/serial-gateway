@@ -12,7 +12,9 @@ Web UI 与 xterm.js 已嵌入，编译后的 `serial-gateway.exe` 是单文件�
 
 ```text
 serial-gateway/
-├── cmd/serial-gateway/       CLI、参数校验、进程生命周期
+├── build/                    EXE 和运行时配置（构建生成）
+├── cmd/serial-gateway/       入口、配置加载、进程生命周期
+├── internal/config/          JSON 配置生成、加载和校验
 ├── internal/gateway/         串口、Raw TCP、WebSocket、HTTP API
 ├── internal/webui/           嵌入式前端和本地 xterm.js
 ├── scripts/build.ps1         测试、静态检查、版本注入、构建
@@ -24,30 +26,46 @@ serial-gateway/
 
 ## 运行
 
-```powershell
-.\serial-gateway.exe -baud 115200
-```
-
-从源码运行：
+先构建，然后不带参数启动：
 
 ```powershell
-go run ./cmd/serial-gateway -baud 115200
+.\scripts\build.ps1
+.\build\serial-gateway.exe
 ```
 
-主要参数：
+首次启动会在 EXE 同目录创建：
 
 ```text
--baud 115200                 波特率
--data-bits 8                 数据位：5、6、7、8
--parity none                 校验：none、odd、even、mark、space
--stop-bits 1                 停止位：1、1.5、2
--http 127.0.0.1:8080         Web UI 和 API 地址
--tcp-host 127.0.0.1          Raw TCP 监听地址
--tcp-base 7000               Raw TCP 基准端口
--scan-interval 2s            热插拔扫描周期
--ports COM13,COM14           只打开指定串口；默认打开全部
--version                     显示版本和构建信息
+build/serial-gateway.json
 ```
+
+程序随后直接使用默认配置运行。通常不需要手动编辑 JSON：打开 Web UI，点击右上角 **PORT SETTINGS** 即可选择启用的串口并修改串口、Web/API 和 Raw TCP 参数。端口选择会立即生效；其他参数保存后按页面提示重启程序生效。
+
+JSON 仍可用于脚本化部署或离线修改：
+
+```json
+{
+  "serial": {
+    "ports": [],
+    "baud_rate": 115200,
+    "data_bits": 8,
+    "parity": "none",
+    "stop_bits": "1"
+  },
+  "http": {
+    "address": "127.0.0.1:8080"
+  },
+  "tcp": {
+    "host": "127.0.0.1",
+    "base_port": 7000,
+    "escape_delay_ms": 5,
+    "normalize_crlf": true
+  },
+  "scan_interval_ms": 2000
+}
+```
+
+`serial.ports` 为空表示打开全部串口；只使用 COM13 时在设置面板取消“自动启用所有检测到的串口”，然后勾选 COM13。应用启动不需要且不提供运行参数。
 
 默认仅监听本机。若主动改为 `0.0.0.0`，当前版本不会提供认证或 TLS。
 
@@ -59,9 +77,11 @@ go run ./cmd/serial-gateway -baud 115200
 
 Windows COM 端口采用稳定映射：`COMn → tcp-base + n`。默认情况下，`COM3` 对应 `127.0.0.1:7003`。其他平台的设备名按发现顺序分配端口；进程运行期间拔插不会改变映射。
 
-TCP 双向传输任意原始字节。串口参数由网关命令行决定，SecureCRT Raw 会话中的串口选项不生效。多个客户端可以同时观察一个串口，其发送数据按到达顺序串行写入。
+TCP 双向传输任意原始字节。串口参数由 `serial-gateway.json` 决定，SecureCRT Raw 会话中的串口选项不生效。多个客户端可以同时观察一个串口，其发送数据按到达顺序串行写入。
 
 Raw TCP 不携带 Break、DTR、RTS 等串口带外控制信号。
+
+默认启用交互终端兼容：连续方向键等 ESC 序列之间加入 5 ms 间隔，并把 CRLF 规范化为 CR。严格二进制透明场景把 `tcp.escape_delay_ms` 改为 `0`，并将 `tcp.normalize_crlf` 改为 `false`。
 
 ## AI 调试 API
 
@@ -96,16 +116,10 @@ curl.exe "http://127.0.0.1:8080/api/v1/read?port=COM3&after=0&encoding=hex&wait_
 
 ## 构建与验证
 
-推荐使用构建脚本，它会依次执行测试、静态检查、版本注入和单文件构建：
+使用构建脚本，它会依次执行测试、静态检查、Git 构建标识注入和单文件构建：
 
 ```powershell
-.\scripts\build.ps1 -Version 0.2.0
+.\scripts\build.ps1
 ```
 
-手动执行：
-
-```powershell
-go test ./...
-go vet ./...
-go build -o serial-gateway.exe ./cmd/serial-gateway
-```
+构建标识取当前 12 位 Git 提交号；工作区存在未提交修改时追加 `-dirty`。产物固定写入 `build/serial-gateway.exe`，启动日志和 `/api/v1/info` 会报告该标识。

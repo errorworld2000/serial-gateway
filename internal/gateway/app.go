@@ -30,6 +30,8 @@ type App struct {
 	openSerial  SerialOpener
 	build       BuildInfo
 	allowed     map[string]bool
+	tcpInput    TCPInputOptions
+	detected    []string
 }
 
 func (a *App) SetAllowedPorts(names []string) {
@@ -42,6 +44,28 @@ func (a *App) SetAllowedPorts(names []string) {
 	a.mu.Lock()
 	a.allowed = allowed
 	a.mu.Unlock()
+}
+
+func (a *App) SetTCPInputOptions(options TCPInputOptions) {
+	a.mu.Lock()
+	a.tcpInput = options
+	a.mu.Unlock()
+}
+
+func (a *App) DetectedPorts() []string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return append([]string(nil), a.detected...)
+}
+
+func (a *App) ApplyAllowedPorts(names []string) error {
+	a.SetAllowedPorts(names)
+	ports, err := serial.GetPortsList()
+	if err != nil {
+		return err
+	}
+	a.Reconcile(ports)
+	return nil
 }
 
 func NewApp(settings SerialSettings, tcpHost string, tcpBase int, opener SerialOpener) *App {
@@ -115,6 +139,9 @@ func (a *App) gatewayList() []*SerialGateway {
 
 func (a *App) Reconcile(portNames []string) {
 	sort.Strings(portNames)
+	a.mu.Lock()
+	a.detected = append(a.detected[:0], portNames...)
+	a.mu.Unlock()
 	present := make(map[string]bool, len(portNames))
 	for _, name := range portNames {
 		a.mu.RLock()
@@ -129,6 +156,7 @@ func (a *App) Reconcile(portNames []string) {
 			a.mu.Lock()
 			tcpPort := a.allocateTCPPort(name)
 			gateway = NewSerialGateway(name, a.serial, a.tcpHost, tcpPort)
+			gateway.SetTCPInputOptions(a.tcpInput)
 			a.gateways[name] = gateway
 			a.mu.Unlock()
 			log.Printf("Discovered serial port %s (SecureCRT Raw TCP: %s)", name, gateway.TCPAddress())

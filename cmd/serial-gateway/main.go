@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"serial-gateway/internal/config"
 	"serial-gateway/internal/gateway"
 	"serial-gateway/internal/webui"
 
@@ -26,50 +26,42 @@ var (
 )
 
 func main() {
-	baudRate := flag.Int("baud", 115200, "serial baud rate")
-	dataBits := flag.Int("data-bits", 8, "serial data bits: 5, 6, 7, or 8")
-	parityName := flag.String("parity", "none", "serial parity: none, odd, even, mark, or space")
-	stopBitsName := flag.String("stop-bits", "1", "serial stop bits: 1, 1.5, or 2")
-	httpAddress := flag.String("http", "127.0.0.1:8080", "HTTP listen address")
-	tcpHost := flag.String("tcp-host", "127.0.0.1", "SecureCRT Raw TCP listen host")
-	tcpBase := flag.Int("tcp-base", 7000, "first SecureCRT Raw TCP port")
-	scanInterval := flag.Duration("scan-interval", 2*time.Second, "serial hot-plug scan interval")
-	portNames := flag.String("ports", "", "comma-separated serial port allowlist, for example COM13,COM14")
-	showVersion := flag.Bool("version", false, "print version information and exit")
-	flag.Parse()
-
-	if *showVersion {
-		fmt.Printf("serial-gateway %s (commit %s, built %s)\n", version, commit, buildDate)
-		return
-	}
-	if *dataBits < 5 || *dataBits > 8 {
-		log.Fatalf("Invalid -data-bits %d: expected 5, 6, 7, or 8", *dataBits)
-	}
-	parity, err := parseParity(*parityName)
+	configPath, err := config.PathNextToExecutable()
 	if err != nil {
 		log.Fatal(err)
 	}
-	stopBits, err := parseStopBits(*stopBitsName)
+	runtimeConfig, created, err := config.LoadOrCreate(configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if *tcpBase < 1 || *tcpBase > 65535 {
-		log.Fatalf("Invalid -tcp-base %d: expected 1-65535", *tcpBase)
+	if created {
+		log.Printf("Created default configuration: %s", configPath)
 	}
-	if *scanInterval <= 0 {
-		log.Fatalf("Invalid -scan-interval %s: expected a positive duration", *scanInterval)
+	log.Printf("Using configuration: %s", configPath)
+
+	parity, err := parseParity(runtimeConfig.Serial.Parity)
+	if err != nil {
+		log.Fatal(err)
+	}
+	stopBits, err := parseStopBits(runtimeConfig.Serial.StopBits)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	mode := serial.Mode{BaudRate: *baudRate, DataBits: *dataBits, Parity: parity, StopBits: stopBits}
+	mode := serial.Mode{BaudRate: runtimeConfig.Serial.BaudRate, DataBits: runtimeConfig.Serial.DataBits, Parity: parity, StopBits: stopBits}
 	opener := func(name string) (io.ReadWriteCloser, error) {
 		return serial.Open(name, &mode)
 	}
-	settings := gateway.SerialSettings{BaudRate: *baudRate, DataBits: *dataBits, Parity: strings.ToUpper((*parityName)[:1]), StopBits: *stopBitsName}
-	app := gateway.NewApp(settings, *tcpHost, *tcpBase, opener)
-	app.SetBuildInfo(gateway.BuildInfo{Version: version, Commit: commit, BuildDate: buildDate})
-	if *portNames != "" {
-		app.SetAllowedPorts(strings.Split(*portNames, ","))
+	settings := gateway.SerialSettings{
+		BaudRate: runtimeConfig.Serial.BaudRate,
+		DataBits: runtimeConfig.Serial.DataBits,
+		Parity:   strings.ToUpper(runtimeConfig.Serial.Parity[:1]),
+		StopBits: runtimeConfig.Serial.StopBits,
 	}
+	app := gateway.NewApp(settings, runtimeConfig.TCP.Host, runtimeConfig.TCP.BasePort, opener)
+	app.SetBuildInfo(gateway.BuildInfo{Version: version, Commit: commit, BuildDate: buildDate})
+	app.SetTCPInputOptions(gateway.TCPInputOptions{EscapeDelay: runtimeConfig.EscapeDelay(), NormalizeCRLF: runtimeConfig.TCP.NormalizeCRLF})
+	app.SetAllowedPorts(runtimeConfig.Serial.Ports)
 	ports, err := serial.GetPortsList()
 	if err != nil {
 		log.Printf("Initial serial scan failed: %v", err)
@@ -79,18 +71,22 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	go app.ScanLoop(ctx, *scanInterval)
+	go app.ScanLoop(ctx, runtimeConfig.ScanInterval())
 
+	mux := gateway.NewMux(app, webui.FileSystem())
+	configController := newConfigController(configPath, runtimeConfig, app)
+	mux.HandleFunc("/api/v1/config", configController.Handle)
 	server := &http.Server{
-		Addr:              *httpAddress,
-		Handler:           gateway.NewMux(app, webui.FileSystem()),
+		Addr:              runtimeConfig.HTTP.Address,
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 	}
 	serverErrors := make(chan error, 1)
 	go func() {
+		log.Printf("Serial Gateway build %s (commit %s, built %s)", version, commit, buildDate)
 		log.Printf("Serial mode: %s", settings)
-		log.Printf("Web UI and AI API started at http://%s", *httpAddress)
+		log.Printf("Web UI and AI API started at http://%s", runtimeConfig.HTTP.Address)
 		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			serverErrors <- err
 		}
@@ -126,7 +122,7 @@ func parseParity(value string) (serial.Parity, error) {
 	case "space", "s":
 		return serial.SpaceParity, nil
 	default:
-		return serial.NoParity, fmt.Errorf("invalid -parity %q: expected none, odd, even, mark, or space", value)
+		return serial.NoParity, fmt.Errorf("invalid serial.parity %q: expected none, odd, even, mark, or space", value)
 	}
 }
 
@@ -139,6 +135,6 @@ func parseStopBits(value string) (serial.StopBits, error) {
 	case "2":
 		return serial.TwoStopBits, nil
 	default:
-		return serial.OneStopBit, fmt.Errorf("invalid -stop-bits %q: expected 1, 1.5, or 2", value)
+		return serial.OneStopBit, fmt.Errorf("invalid serial.stop_bits %q: expected 1, 1.5, or 2", value)
 	}
 }

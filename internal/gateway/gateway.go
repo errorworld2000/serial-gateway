@@ -84,6 +84,13 @@ type GatewayStatus struct {
 	TCPClients       int    `json:"tcp_clients"`
 	WebSocketClients int    `json:"websocket_clients"`
 	LatestSequence   uint64 `json:"latest_sequence"`
+	TCPEscapeDelayMS int64  `json:"tcp_escape_delay_ms"`
+	TCPNormalizeCRLF bool   `json:"tcp_normalize_crlf"`
+}
+
+type TCPInputOptions struct {
+	EscapeDelay   time.Duration
+	NormalizeCRLF bool
 }
 
 type SerialGateway struct {
@@ -108,6 +115,7 @@ type SerialGateway struct {
 	listenerMu sync.Mutex
 	listener   net.Listener
 	closed     atomic.Bool
+	tcpInput   TCPInputOptions
 }
 
 func NewSerialGateway(name string, settings SerialSettings, tcpHost string, tcpPort int) *SerialGateway {
@@ -122,6 +130,10 @@ func NewSerialGateway(name string, settings SerialSettings, tcpHost string, tcpP
 
 func (g *SerialGateway) Name() string       { return g.name }
 func (g *SerialGateway) TCPAddress() string { return g.tcpAddress }
+
+func (g *SerialGateway) SetTCPInputOptions(options TCPInputOptions) {
+	g.tcpInput = options
+}
 
 func (g *SerialGateway) Connected() bool {
 	g.portMu.RLock()
@@ -343,14 +355,16 @@ func (g *SerialGateway) broadcast(data []byte) {
 
 func (g *SerialGateway) Status() GatewayStatus {
 	status := GatewayStatus{
-		Name:           g.name,
-		BaudRate:       g.serial.BaudRate,
-		DataBits:       g.serial.DataBits,
-		Parity:         g.serial.Parity,
-		StopBits:       g.serial.StopBits,
-		Connected:      g.Connected(),
-		TCPAddress:     g.tcpAddress,
-		LatestSequence: g.sequence.Load(),
+		Name:             g.name,
+		BaudRate:         g.serial.BaudRate,
+		DataBits:         g.serial.DataBits,
+		Parity:           g.serial.Parity,
+		StopBits:         g.serial.StopBits,
+		Connected:        g.Connected(),
+		TCPAddress:       g.tcpAddress,
+		LatestSequence:   g.sequence.Load(),
+		TCPEscapeDelayMS: g.tcpInput.EscapeDelay.Milliseconds(),
+		TCPNormalizeCRLF: g.tcpInput.NormalizeCRLF,
 	}
 	g.listenerMu.Lock()
 	status.TCPListening = g.listener != nil
@@ -416,11 +430,12 @@ func (g *SerialGateway) handleTCP(conn net.Conn) {
 	}, conn.Close)
 	defer g.Unsubscribe(subscriber)
 	log.Printf("Raw TCP client connected to %s: %s", g.name, remote)
+	input := terminalInputWriter{gateway: g, options: g.tcpInput}
 	buffer := make([]byte, 4096)
 	for {
 		n, err := conn.Read(buffer)
 		if n > 0 {
-			if _, writeErr := g.Write(buffer[:n]); writeErr != nil {
+			if writeErr := input.Write(buffer[:n]); writeErr != nil {
 				log.Printf("Raw TCP serial write error on %s: %v", g.name, writeErr)
 				break
 			}
@@ -430,6 +445,86 @@ func (g *SerialGateway) handleTCP(conn net.Conn) {
 		}
 	}
 	log.Printf("Raw TCP client disconnected from %s: %s", g.name, remote)
+}
+
+type terminalInputUnit struct {
+	data   []byte
+	escape bool
+}
+
+type terminalInputWriter struct {
+	gateway    *SerialGateway
+	options    TCPInputOptions
+	lastEscape time.Time
+}
+
+func (w *terminalInputWriter) Write(data []byte) error {
+	for _, unit := range splitTerminalInput(data, w.options.NormalizeCRLF) {
+		if unit.escape && w.options.EscapeDelay > 0 && !w.lastEscape.IsZero() {
+			remaining := w.options.EscapeDelay - time.Since(w.lastEscape)
+			if remaining > 0 {
+				time.Sleep(remaining)
+			}
+		}
+		if _, err := w.gateway.Write(unit.data); err != nil {
+			return err
+		}
+		if unit.escape {
+			w.lastEscape = time.Now()
+		}
+	}
+	return nil
+}
+
+func splitTerminalInput(data []byte, normalizeCRLF bool) []terminalInputUnit {
+	units := make([]terminalInputUnit, 0, 4)
+	plain := make([]byte, 0, len(data))
+	flushPlain := func() {
+		if len(plain) > 0 {
+			units = append(units, terminalInputUnit{data: append([]byte(nil), plain...)})
+			plain = plain[:0]
+		}
+	}
+	for index := 0; index < len(data); {
+		if normalizeCRLF && data[index] == '\r' && index+1 < len(data) && data[index+1] == '\n' {
+			plain = append(plain, '\r')
+			index += 2
+			continue
+		}
+		if data[index] != 0x1b {
+			plain = append(plain, data[index])
+			index++
+			continue
+		}
+		flushPlain()
+		end := escapeSequenceEnd(data, index)
+		units = append(units, terminalInputUnit{data: append([]byte(nil), data[index:end]...), escape: true})
+		index = end
+	}
+	flushPlain()
+	return units
+}
+
+func escapeSequenceEnd(data []byte, start int) int {
+	if start+1 >= len(data) {
+		return len(data)
+	}
+	switch data[start+1] {
+	case '[':
+		for index := start + 2; index < len(data); index++ {
+			if data[index] >= 0x40 && data[index] <= 0x7e {
+				return index + 1
+			}
+		}
+		return len(data)
+	case 'O':
+		if start+3 <= len(data) {
+			return start + 3
+		}
+		return len(data)
+	default:
+		return start + 2
+	}
 }
 
 func writeAll(writer io.Writer, data []byte) error {
