@@ -287,6 +287,10 @@ func (a *App) HandleWS(w http.ResponseWriter, r *http.Request) {
 
 func NewMux(app *App, publicFiles http.FileSystem) *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/docs", app.HandleAPIDocs)
+	mux.HandleFunc("/api/docs/", app.HandleAPIDocs)
+	mux.HandleFunc("/api/v1/guide", app.HandleAIGuide)
+	mux.HandleFunc("/api/v1/openapi.json", app.HandleOpenAPI)
 	mux.HandleFunc("/ws", app.HandleWS)
 	mux.HandleFunc("/api/ports", app.HandleLegacyPorts)
 	mux.HandleFunc("/api/v1/ports", app.HandlePortStatus)

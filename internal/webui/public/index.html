@@ -58,6 +58,11 @@
             gap: 24px;
         }
 
+		.header-actions {
+			display: flex;
+			gap: 8px;
+		}
+
         button {
             font: inherit;
         }
@@ -71,6 +76,7 @@
             cursor: pointer;
             font-family: var(--font-mono);
             font-size: 12px;
+			text-decoration: none;
         }
 
         .settings-button:hover,
@@ -315,7 +321,10 @@
     <header>
         <div class="title-row">
             <h1>Serial Gateway</h1>
-            <button class="settings-button" id="settings-open" type="button">PORT SETTINGS</button>
+			<div class="header-actions">
+				<a class="settings-button" href="/api/docs" target="_blank" rel="noopener">API DOCS</a>
+				<button class="settings-button" id="settings-open" type="button">PORT SETTINGS</button>
+			</div>
         </div>
         <div class="tabs" id="tabs-container">
             <!-- Tabs will be dynamically added here -->

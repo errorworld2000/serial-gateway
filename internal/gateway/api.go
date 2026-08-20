@@ -90,6 +90,9 @@ func (a *App) HandleInfo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"service":         "serial-gateway",
 		"api_version":     "v1",
+		"documentation":   "/api/docs",
+		"ai_guide":        "/api/v1/guide",
+		"openapi":         "/api/v1/openapi.json",
 		"build":           build,
 		"serial_defaults": settings,
 	})

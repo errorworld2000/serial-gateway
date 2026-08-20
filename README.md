@@ -9,6 +9,8 @@
 
 Web UI 与 xterm.js 已嵌入，编译后的 `serial-gateway.exe` 是单文件程序。
 
+运行后，API 文档直接访问 `http://127.0.0.1:8080/api/docs`。该页面同时链接适合 AI 读取的 Markdown 指南和 OpenAPI 3.1 JSON；把这一条链接交给新的本地 AI 上下文即可自行发现调用方式。
+
 ## 项目结构
 
 ```text
