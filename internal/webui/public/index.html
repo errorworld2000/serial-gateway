@@ -669,6 +669,7 @@
                 term,
                 socket: null,
                 tcpAddress: status.tcp_address,
+				telnetAddress: status.telnet_address,
                 connected: false
             };
 
@@ -694,7 +695,8 @@
 
             socket.onopen = () => {
                 session.indicator.classList.add('connected');
-                session.term.writeln(`\x1b[32m[SYS] CONNECTED TO ${session.portName} · RAW TCP ${session.tcpAddress}\x1b[0m\r\n`);
+				session.term.writeln(`\x1b[32m[SYS] WEB TERMINAL CONNECTED DIRECTLY TO ${session.portName}\x1b[0m`);
+				session.term.writeln(`\x1b[90m[SYS] SECURECRT TELNET ${session.telnetAddress || 'DISABLED'} · RAW TCP ${session.tcpAddress}\x1b[0m\r\n`);
             };
 
             socket.onmessage = (event) => {
