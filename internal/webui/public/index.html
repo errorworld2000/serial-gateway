@@ -6,6 +6,7 @@
     <!-- xterm.js -->
     <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
     <script src="/vendor/xterm/xterm.js"></script>
+    <link rel="stylesheet" href="/commands.css">
 
     <style>
         :root {
@@ -331,9 +332,25 @@
         </div>
     </header>
 
+    <main class="workbench">
     <div class="terminal-containers" id="terminals-wrapper">
         <!-- Terminal divs will be dynamically added here -->
     </div>
+    <aside class="command-panel" aria-label="常用命令">
+        <div class="command-heading"><strong>常用命令</strong><button class="action-button" id="command-add" type="button">＋ 新建</button></div>
+        <p class="command-help">点击发送到当前串口。按钮保存在本浏览器。</p>
+        <div id="command-list"></div>
+        <form id="command-editor" hidden>
+            <label>按钮名称<input id="command-name" required maxlength="60" placeholder="例如 load-usb"></label>
+            <label>按钮颜色<select id="command-color"><option value="#4A9E5C">绿色</option><option value="#5195db">蓝色</option><option value="#ce9e45">黄色</option><option value="#D71921">红色</option></select></label>
+            <label>发送内容<textarea id="command-text" rows="6" required spellcheck="false" placeholder="help\r"></textarea></label>
+            <p class="command-help"><code>\r</code> 回车 · <code>\n</code> 换行 · <code>\p</code> 暂停一秒<br><code>\t</code> Tab · <code>\e</code> ESC · <code>\b</code> 退格 · <code>\\</code> 反斜杠<br>不自动追加回车；执行命令请在末尾加 <code>\r</code>。实际换行按回车发送。</p>
+            <div class="command-heading"><button class="action-button" id="command-cancel" type="button">取消</button><button class="action-button primary" type="submit">保存按钮</button></div>
+        </form>
+        <p id="command-status" role="status" aria-live="polite"></p>
+        <button class="action-button" id="command-stop" type="button" hidden>停止后续发送</button>
+    </aside>
+    </main>
 
     <div class="settings-overlay hidden" id="settings-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <div class="settings-panel">
@@ -660,6 +677,31 @@
                 }
             });
             term.open(containerEl);
+            // Capture before xterm's context-menu handler changes the selection.
+            containerEl.addEventListener('contextmenu', async event => {
+                if (event.shiftKey) return;
+                const selection = term.getSelection();
+                const clipboard = navigator.clipboard;
+                // Keep the native menu available on insecure HTTP origins.
+                if (!clipboard || (selection ? !clipboard.writeText : !clipboard.readText)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                try {
+                    if (selection) {
+                        await clipboard.writeText(selection);
+                        term.clearSelection();
+                    } else {
+                        const text = await clipboard.readText();
+                        if (!containerEl.isConnected) return;
+                        term.paste(text);
+                    }
+                    term.focus();
+                } catch (error) {
+                    console.warn('Terminal clipboard access failed', error);
+                    alert('浏览器未允许访问剪贴板。请允许剪贴板权限，或按住 Shift 右键使用菜单复制粘贴。');
+                }
+            }, true);
+            containerEl.title = '选中文字后右键复制，未选中时右键粘贴；Shift+右键打开菜单';
 
             const session = {
                 portName,
@@ -771,5 +813,7 @@
             if (event.key === 'Escape' && !settingsOverlay.classList.contains('hidden')) setSettingsOpen(false);
         });
     </script>
+    <script src="/commands.js"></script>
+    <script>initCommands(() => sessions[activePort]);</script>
 </body>
 </html>

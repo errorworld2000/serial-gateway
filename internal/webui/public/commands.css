@@ -1,0 +1,17 @@
+.workbench { display: flex; flex: 1; min-height: 0; margin: 0 24px 24px; }
+.workbench .terminal-containers { margin: 0; min-width: 0; }
+.command-panel { width: 280px; flex-shrink: 0; box-sizing: border-box; padding: 16px; overflow: auto; background: var(--surface); border: 1px solid var(--border-visible); border-left: 0; }
+.command-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.command-help, #command-status { font-size: 12px; color: var(--text-secondary); line-height: 1.7; overflow-wrap: anywhere; }
+.command-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.command-panel .command-run { flex: 1; min-width: 0; text-align: left; overflow-wrap: anywhere; border-left: 4px solid var(--command-color); }
+.command-panel button:disabled { opacity: .5; cursor: default; }
+#command-editor { border-top: 1px solid var(--border-visible); margin-top: 16px; padding-top: 16px; }
+#command-editor label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+#command-editor input, #command-editor select, #command-editor textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; padding: 8px; background: var(--black); color: var(--text-primary); border: 1px solid var(--border-visible); font: 12px var(--font-mono); }
+#command-editor textarea { resize: vertical; }
+@media (max-width: 700px) {
+    .workbench { flex-direction: column; margin: 0 12px 12px; }
+    .workbench .terminal-containers { min-height: 160px; }
+    .command-panel { width: 100%; max-height: 40vh; border-left: 1px solid var(--border-visible); }
+}
