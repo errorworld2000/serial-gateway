@@ -319,10 +319,12 @@
     </style>
 </head>
 <body>
+    <canvas id="signal-canvas" aria-hidden="true"></canvas>
     <header>
         <div class="title-row">
             <h1>Serial Gateway</h1>
 			<div class="header-actions">
+                <button class="settings-button" id="signal-toggle" type="button" aria-pressed="true">动效：开</button>
 				<a class="settings-button" href="/api/docs" target="_blank" rel="noopener">API DOCS</a>
 				<button class="settings-button" id="settings-open" type="button">PORT SETTINGS</button>
 			</div>
@@ -337,8 +339,6 @@
         <!-- Terminal divs will be dynamically added here -->
     </div>
     <aside class="command-panel" aria-label="常用命令">
-        <div class="signal-stage" aria-hidden="true"><canvas id="signal-canvas"></canvas><span>SIGNAL FIELD</span></div>
-        <button class="action-button signal-toggle" id="signal-toggle" type="button" aria-pressed="true">3D 动效：开</button>
         <div class="command-heading"><strong>常用命令</strong><button class="action-button" id="command-add" type="button">＋ 新建</button></div>
         <p class="command-help">点击发送到当前串口。按钮保存在本浏览器。</p>
         <div id="command-list"></div>
@@ -667,12 +667,13 @@
 
             // Initialize xterm.js
             const term = new Terminal({
+                allowTransparency: true,
                 cursorBlink: true,
                 fontFamily: 'Cascadia Mono, Consolas, Courier New, monospace',
                 fontSize: 14,
                 lineHeight: 1.2,
                 theme: {
-                    background: '#111111',
+                    background: '#00000000',
                     foreground: '#E8E8E8',
                     cursor: '#E8E8E8',
                     selection: 'rgba(232, 232, 232, 0.3)'

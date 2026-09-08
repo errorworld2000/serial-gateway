@@ -1,9 +1,11 @@
 .workbench { display: flex; flex: 1; min-height: 0; margin: 0 24px 24px; }
-.signal-stage { position: relative; height: 116px; margin-bottom: 8px; overflow: hidden; border: 1px solid #29383a; border-radius: 6px; background: radial-gradient(ellipse at center, #142326, #101516 75%); }
-.signal-stage canvas { display: block; width: 100%; height: 100%; }
-.signal-stage span { position: absolute; left: 10px; bottom: 8px; color: #7da5aa; font: 9px var(--font-mono); letter-spacing: .18em; pointer-events: none; }
-.command-panel .signal-toggle { display: block; margin: 0 0 18px auto; font-size: 10px; padding: 4px 8px; color: var(--text-secondary); }
-.signal-fallback canvas { visibility: hidden; }
+#signal-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+body > header, body > .workbench { position: relative; z-index: 1; }
+body .workbench .terminal-containers { background: #080e1480; border-color: #759eb32e; border-radius: 10px 0 0 10px; }
+body .workbench .command-panel { background: #0d151cb0; border-color: #759eb32e; border-radius: 0 10px 10px 0; }
+.signal-ripple { position: fixed; z-index: 200; width: 72px; height: 72px; margin: -36px; border: 1px solid #95e6ed99; border-radius: 50%; pointer-events: none; box-shadow: inset 0 0 14px #80dce51f, 0 0 12px #80dce51f; animation: signal-click 480ms ease-out both; }
+@keyframes signal-click { from { opacity: .8; transform: scale(.15); } to { opacity: 0; transform: scale(1.2); } }
+@media (prefers-reduced-motion: reduce) { .signal-ripple { display: none; } }
 .workbench .terminal-containers { margin: 0; min-width: 0; }
 .command-panel { width: 280px; flex-shrink: 0; box-sizing: border-box; padding: 16px; overflow: auto; background: var(--surface); border: 1px solid var(--border-visible); border-left: 0; }
 .command-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
