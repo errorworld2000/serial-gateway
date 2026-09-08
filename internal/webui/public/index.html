@@ -337,6 +337,8 @@
         <!-- Terminal divs will be dynamically added here -->
     </div>
     <aside class="command-panel" aria-label="常用命令">
+        <div class="signal-stage" aria-hidden="true"><canvas id="signal-canvas"></canvas><span>SIGNAL FIELD</span></div>
+        <button class="action-button signal-toggle" id="signal-toggle" type="button" aria-pressed="true">3D 动效：开</button>
         <div class="command-heading"><strong>常用命令</strong><button class="action-button" id="command-add" type="button">＋ 新建</button></div>
         <p class="command-help">点击发送到当前串口。按钮保存在本浏览器。</p>
         <div id="command-list"></div>
@@ -815,5 +817,6 @@
     </script>
     <script src="/commands.js"></script>
     <script>initCommands(() => sessions[activePort]);</script>
+    <script type="module" src="/signal-field.js"></script>
 </body>
 </html>
