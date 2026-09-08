@@ -54,7 +54,7 @@ body .workbench .command-panel { background: var(--surface); border-color: var(-
     .command-panel .action-button:not(:disabled):hover, .command-panel .action-button:not(:disabled):active, .settings-button:active { transform: none; }
     .command-run.is-running::after { animation: none; width: 100%; transform: none; }
 }
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-aspect-ratio: 1/1) {
     .workbench { flex-direction: column; margin: 0 12px 12px; }
     .workbench .terminal-containers { min-height: 160px; }
     .command-panel { width: 100%; max-height: 40vh; border-left: 1px solid var(--border-visible); }
@@ -73,3 +73,14 @@ body .workbench .command-panel { background: var(--surface); border-color: var(-
 .hologram-globe i { position: absolute; inset: 0; border: 1px solid #dfc6acb0; border-radius: 50%; backface-visibility: visible; }
 @keyframes hologram-unfold { 0% { opacity: 0; transform: scale(.65); } 20% { opacity: .9; transform: scale(1); } 65% { opacity: .4; } 100% { opacity: 0; transform: scale(4.5,2.4); } }
 @media (prefers-reduced-motion: reduce) { .pet-eyes { animation: none; } .terminal-hologram { display: none; } }
+.command-habitat { position: relative; min-height: 220px; margin: 8px 0; background-image: radial-gradient(#333 1px, transparent 1px); background-size: 16px 16px; }
+.command-habitat #command-list { position: absolute; inset: 0; }
+.command-habitat .command-row { position: absolute; height: 40px; margin: 0; animation: none; }
+.command-habitat .command-run { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; }
+.command-habitat .desk-pet { position: absolute; z-index: 2; width: 38px; height: 34px; padding: 0; margin: 0; border: 0; }
+.command-habitat .desk-pet svg { width: 38px; height: 34px; transform: scaleX(var(--pet-facing, 1)); }
+.command-habitat .desk-pet > span { display: none; }
+.command-context { position: fixed; z-index: 300; padding: 4px; min-width: 110px; background: #1a1917; border: 1px solid #595047; box-shadow: 0 8px 24px #0008; }
+.command-context button { display: block; width: 100%; padding: 9px 16px; border: 0; background: transparent; color: #e8e2d8; text-align: left; cursor: pointer; }
+.command-context button:hover, .command-context button:focus-visible { background: #36312b; outline: none; }
+.command-context button:last-child { color: #cf8273; }

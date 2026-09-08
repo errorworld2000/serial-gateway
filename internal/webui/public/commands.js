@@ -89,22 +89,27 @@ function initCommands(getSession) {
             run.title = command.text;
             run.style.setProperty('--command-color', colors.includes(command.color) ? command.color : colors[0]);
             run.disabled = !!running;
-            run.onclick = () => execute(command);
-            const editButton = document.createElement('button');
-            editButton.type = 'button';
-            editButton.className = 'action-button';
-            editButton.textContent = '编辑';
-            editButton.setAttribute('aria-label', `编辑 ${command.name}`);
-            editButton.onclick = () => edit(index);
-            const remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'action-button';
-            remove.textContent = '×';
-            remove.setAttribute('aria-label', `删除 ${command.name}`);
-            remove.onclick = () => {
-                if (confirm(`删除按钮「${command.name}」？`) && save(commands.filter((_, i) => i !== index))) editor.hidden = true;
+            function openMenu(event) {
+                event.preventDefault();
+                window.openCommandMenu(event, run, () => edit(index), () => {
+                    if (confirm(`删除按钮「${command.name}」？`) && save(commands.filter((_, i) => i !== index))) editor.hidden = true;
+                });
+            }
+            run.oncontextmenu = openMenu;
+            let holdTimer, holdX, holdY, held = false;
+            run.onpointerdown = event => {
+                held = false;
+                if (event.pointerType !== 'touch') return;
+                holdX = event.clientX; holdY = event.clientY;
+                holdTimer = setTimeout(() => { held = true; openMenu(event); }, 550);
             };
-            row.append(run, editButton, remove);
+            run.onpointermove = event => { if (Math.hypot(event.clientX - holdX, event.clientY - holdY) > 10) clearTimeout(holdTimer); };
+            run.onpointerup = run.onpointercancel = () => clearTimeout(holdTimer);
+            run.onclick = event => { if (held) { event.preventDefault(); held = false; return; } return execute(command); };
+            run.onkeydown = event => {
+                if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) openMenu(event);
+            };
+            row.append(run);
             list.append(row);
         });
     }
