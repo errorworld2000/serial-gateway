@@ -324,7 +324,6 @@
         <div class="title-row">
             <h1>Serial Gateway</h1>
 			<div class="header-actions">
-                <button class="settings-button" id="signal-toggle" type="button" aria-pressed="true">动效：开</button>
 				<a class="settings-button" href="/api/docs" target="_blank" rel="noopener">API DOCS</a>
 				<button class="settings-button" id="settings-open" type="button">PORT SETTINGS</button>
 			</div>
@@ -339,6 +338,10 @@
         <!-- Terminal divs will be dynamically added here -->
     </div>
     <aside class="command-panel" aria-label="常用命令">
+        <button class="desk-pet" id="desk-pet" type="button" aria-label="逗逗点阵小猫" title="点一下，打个招呼">
+            <svg viewBox="0 0 64 48" aria-hidden="true"><g fill="currentColor"><path d="M12 8h8v4h4v4h16v-4h4V8h8v28h-4v4H16v-4h-4z"/><path d="M8 28H4v12h12v-4H8zM20 40h8v4h-8zm16 0h8v4h-8z"/></g><g class="pet-eyes" fill="#181715"><path d="M20 23h5v5h-5zm19 0h5v5h-5z"/></g><path d="M29 31h6v3h-6z" fill="#181715"/></svg>
+            <span><strong>DOT</strong><small id="pet-caption">陪你调试 · 点击打招呼</small></span>
+        </button>
         <div class="command-heading"><strong>常用命令</strong><button class="action-button" id="command-add" type="button">＋ 新建</button></div>
         <p class="command-help">点击发送到当前串口。按钮保存在本浏览器。</p>
         <div id="command-list"></div>
@@ -674,9 +677,13 @@
                 lineHeight: 1.2,
                 theme: {
                     background: '#00000000',
-                    foreground: '#E8E8E8',
-                    cursor: '#E8E8E8',
-                    selection: 'rgba(232, 232, 232, 0.3)'
+                    foreground: '#e8e2d8',
+                    cursor: '#d49779',
+                    selectionBackground: '#65534799',
+                    black: '#252320', red: '#cf8273', green: '#a4ad89', yellow: '#d0b483',
+                    blue: '#91a3b0', magenta: '#b49aa8', cyan: '#9fbbb5', white: '#ded8ce',
+                    brightBlack: '#8c867e', brightRed: '#e5a08e', brightGreen: '#bcc79d', brightYellow: '#e6cc9c',
+                    brightBlue: '#afc0ca', brightMagenta: '#ccb0bd', brightCyan: '#bbd5cc', brightWhite: '#f4efe6'
                 }
             });
             term.open(containerEl);
@@ -781,6 +788,7 @@
         }
 
         function selectTab(portName) {
+            const changed = activePort !== portName;
             Object.values(sessions).forEach(s => {
                 s.tab.classList.remove('active');
                 s.container.classList.remove('active');
@@ -791,6 +799,7 @@
                 session.tab.classList.add('active');
                 session.container.classList.add('active');
                 activePort = portName;
+                if (changed) document.dispatchEvent(new CustomEvent('terminal-switch', { detail: { container: session.container } }));
                 requestAnimationFrame(() => {
                     fitTerminal(session);
                     session.term.focus();
@@ -819,5 +828,6 @@
     <script src="/commands.js"></script>
     <script>initCommands(() => sessions[activePort]);</script>
     <script type="module" src="/signal-field.js"></script>
+    <script src="/workbench-effects.js"></script>
 </body>
 </html>

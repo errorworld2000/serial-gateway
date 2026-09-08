@@ -1,12 +1,9 @@
 import * as THREE from './vendor/three/three.module.min.js';
 const canvas = document.getElementById('signal-canvas');
-const toggle = document.getElementById('signal-toggle');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-let enabled = true;
-try { enabled = localStorage.getItem('serial-gateway.motion') !== 'off'; } catch {}
 let renderer;
 try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'low-power' }); }
-catch { canvas.hidden = true; toggle.disabled = true; toggle.textContent = '动效不可用'; }
+catch { canvas.hidden = true; }
 if (renderer) {
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -33,7 +30,7 @@ if (renderer) {
     let frame = 0, last = 0, lost = false, disposed = false, lastKey = 0;
     const target = new THREE.Vector2();
     const ripples = new Set();
-    const moving = () => enabled && !reduced.matches && !document.hidden && !lost && !disposed;
+    const moving = () => !reduced.matches && !document.hidden && !lost && !disposed;
     const render = () => renderer.render(scene, camera);
     function tick(now) {
         frame = requestAnimationFrame(tick);
@@ -44,8 +41,6 @@ if (renderer) {
     }
     function sync() {
         cancelAnimationFrame(frame); frame = 0;
-        toggle.setAttribute('aria-pressed', String(enabled && !reduced.matches));
-        toggle.textContent = reduced.matches ? '动效：系统静止' : `动效：${enabled ? '开' : '关'}`;
         if (!moving()) { ripples.forEach(r => r.remove()); ripples.clear(); uniforms.energy.value = 0; }
         if (disposed || lost || document.hidden) return;
         render();
@@ -77,7 +72,6 @@ if (renderer) {
             terminal.animate([{ boxShadow: 'inset 0 -1px 0 #e8e8e870' }, { boxShadow: 'inset 0 -1px 0 #e8e8e800' }], { duration: 260, easing: 'ease-out' });
         }
     }
-    toggle.addEventListener('click', () => { enabled = !enabled; try { localStorage.setItem('serial-gateway.motion', enabled ? 'on' : 'off'); } catch {} sync(); });
     document.addEventListener('pointermove', pointerMove, { passive: true });
     document.addEventListener('pointerdown', feedback, { passive: true });
     document.addEventListener('keydown', keyFeedback, true);

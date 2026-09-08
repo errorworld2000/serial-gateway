@@ -1,7 +1,7 @@
 .workbench { display: flex; flex: 1; min-height: 0; margin: 0 24px 24px; }
 #signal-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
 body > header, body > .workbench { position: relative; z-index: 1; }
-body .workbench .terminal-containers { background: #111111f5; border-color: var(--border-visible); border-radius: 0; }
+body .workbench .terminal-containers { background: #181715f7; border-color: #37332e; border-radius: 0; }
 body .workbench .command-panel { background: var(--surface); border-color: var(--border-visible); border-radius: 0; }
 .signal-ripple { position: fixed; z-index: 200; width: 36px; height: 36px; margin: -18px; border: 2px dotted #e8e8e8; border-radius: 50%; pointer-events: none; box-shadow: none; animation: signal-click 320ms ease-out both; }
 @keyframes signal-click { from { opacity: .8; transform: scale(.15); } to { opacity: 0; transform: scale(1.2); } }
@@ -61,3 +61,15 @@ body .workbench .command-panel { background: var(--surface); border-color: var(-
 }
 
 .signal-ripple::after { content: ''; position: absolute; width: 3px; height: 3px; background: var(--accent); top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.desk-pet { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 0 16px; margin-bottom: 16px; background: none; border: 0; border-bottom: 1px dotted #45403a; color: #d49779; text-align: left; cursor: pointer; }
+.desk-pet svg { width: 52px; height: 44px; flex-shrink: 0; }
+.desk-pet strong { display: block; font: 12px var(--font-mono); letter-spacing: .16em; }
+.desk-pet small { display: block; margin-top: 6px; font-size: 11px; color: #a49c91; }
+.desk-pet:focus-visible { outline: 1px solid #d49779; outline-offset: 3px; }
+.pet-eyes { transform-box: fill-box; transform-origin: center; animation: pet-blink 6s infinite; }
+@keyframes pet-blink { 0%, 43%, 47%, 100% { transform: scaleY(1); } 45% { transform: scaleY(.1); } }
+.terminal-hologram { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; pointer-events: none; perspective: 600px; animation: hologram-unfold 520ms ease-out both; }
+.hologram-globe { width: 84px; height: 84px; position: relative; transform-style: preserve-3d; transform: rotateX(-22deg) rotateY(30deg); }
+.hologram-globe i { position: absolute; inset: 0; border: 1px solid #dfc6acb0; border-radius: 50%; backface-visibility: visible; }
+@keyframes hologram-unfold { 0% { opacity: 0; transform: scale(.65); } 20% { opacity: .9; transform: scale(1); } 65% { opacity: .4; } 100% { opacity: 0; transform: scale(4.5,2.4); } }
+@media (prefers-reduced-motion: reduce) { .pet-eyes { animation: none; } .terminal-hologram { display: none; } }

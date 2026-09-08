@@ -2,6 +2,8 @@
 
 Preserve the existing Nothing-inspired visual style: black surfaces, monochrome dot matrix, square borders, restrained red accents. Motion should reinforce this style; avoid colored auroras, neon glows, glass panels, and standalone decorative 3D widgets.
 
+The user also requested warm Claude Code-inspired terminal colors, a brief holographic sphere unfolding on terminal switches, and a small interactive pet. These are intentional additions to the Nothing base. Do not add an animation toggle; respect the system reduced-motion preference.
+
 After completing a requested update:
 
 1. Run the relevant checks and commit the completed changes.
