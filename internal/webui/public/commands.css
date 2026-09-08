@@ -1,9 +1,9 @@
 .workbench { display: flex; flex: 1; min-height: 0; margin: 0 24px 24px; }
 #signal-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
 body > header, body > .workbench { position: relative; z-index: 1; }
-body .workbench .terminal-containers { background: #080e1480; border-color: #759eb32e; border-radius: 10px 0 0 10px; }
-body .workbench .command-panel { background: #0d151cb0; border-color: #759eb32e; border-radius: 0 10px 10px 0; }
-.signal-ripple { position: fixed; z-index: 200; width: 72px; height: 72px; margin: -36px; border: 1px solid #95e6ed99; border-radius: 50%; pointer-events: none; box-shadow: inset 0 0 14px #80dce51f, 0 0 12px #80dce51f; animation: signal-click 480ms ease-out both; }
+body .workbench .terminal-containers { background: #111111f5; border-color: var(--border-visible); border-radius: 0; }
+body .workbench .command-panel { background: var(--surface); border-color: var(--border-visible); border-radius: 0; }
+.signal-ripple { position: fixed; z-index: 200; width: 36px; height: 36px; margin: -18px; border: 2px dotted #e8e8e8; border-radius: 50%; pointer-events: none; box-shadow: none; animation: signal-click 320ms ease-out both; }
 @keyframes signal-click { from { opacity: .8; transform: scale(.15); } to { opacity: 0; transform: scale(1.2); } }
 @media (prefers-reduced-motion: reduce) { .signal-ripple { display: none; } }
 .workbench .terminal-containers { margin: 0; min-width: 0; }
@@ -24,22 +24,22 @@ body .workbench .command-panel { background: #0d151cb0; border-color: #759eb32e;
 .command-panel .action-button, .settings-button, .tab {
     transition: transform 160ms var(--motion-ease), background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
-.command-panel .action-button { border-radius: 5px; }
-.command-panel .action-button:not(:disabled):hover { transform: translateY(-2px); background-color: #242424; box-shadow: 0 5px 12px #0003; }
+.command-panel .action-button { border-radius: 0; }
+.command-panel .action-button:not(:disabled):hover { transform: none; background-color: #242424; box-shadow: none; }
 .command-panel .action-button:not(:disabled):active, .settings-button:active { transform: translateY(0) scale(.97); box-shadow: none; }
 .command-panel .command-run { position: relative; overflow: hidden; }
-.command-panel .command-run:not(:disabled):hover { border-left-color: var(--command-color); background-color: color-mix(in srgb, var(--command-color) 12%, #1a1a1a); }
-.command-panel .action-button:focus-visible, .settings-button:focus-visible { outline: 2px solid #a7bfd3; outline-offset: 3px; }
+.command-panel .command-run:not(:disabled):hover { border-left-color: var(--command-color); background-color: #242424; }
+.command-panel .action-button:focus-visible, .settings-button:focus-visible { outline: 2px solid #E8E8E8; outline-offset: 3px; }
 .command-enter { animation: command-enter 240ms var(--motion-ease) var(--enter-delay, 0ms) both; }
 #command-editor:not([hidden]) { animation: command-enter 220ms var(--motion-ease) both; }
-#command-editor input, #command-editor select, #command-editor textarea { border-radius: 4px; transition: border-color 180ms ease, box-shadow 180ms ease; }
-#command-editor input:focus, #command-editor select:focus, #command-editor textarea:focus { outline: none; border-color: #819aaa; box-shadow: 0 0 0 3px #819aaa20; }
+#command-editor input, #command-editor select, #command-editor textarea { border-radius: 0; transition: border-color 180ms ease, box-shadow 180ms ease; }
+#command-editor input:focus, #command-editor select:focus, #command-editor textarea:focus { outline: none; border-color: #999999; box-shadow: 0 0 0 3px #ffffff12; }
 .command-panel .command-run.is-running { opacity: 1; border-left-color: var(--command-color); }
 .command-run.is-running::after { content: ''; position: absolute; height: 2px; width: 35%; bottom: 0; left: 0; background: var(--command-color); animation: command-progress 1100ms ease-in-out infinite; }
 #command-status { transition: color 180ms ease; }
 #command-status[data-state="success"] { color: #7cc88c; }
 #command-status[data-state="error"] { color: #ed979b; }
-#command-status[data-state="running"] { color: #b0c8df; }
+#command-status[data-state="running"] { color: #E8E8E8; }
 #command-stop:not([hidden]) { animation: command-enter 180ms var(--motion-ease) both; }
 .settings-overlay:not(.hidden) { animation: overlay-enter 160ms ease-out; }
 .settings-overlay:not(.hidden) .settings-panel { animation: dialog-enter 220ms var(--motion-ease); }
@@ -59,3 +59,5 @@ body .workbench .command-panel { background: #0d151cb0; border-color: #759eb32e;
     .workbench .terminal-containers { min-height: 160px; }
     .command-panel { width: 100%; max-height: 40vh; border-left: 1px solid var(--border-visible); }
 }
+
+.signal-ripple::after { content: ''; position: absolute; width: 3px; height: 3px; background: var(--accent); top: 50%; left: 50%; transform: translate(-50%, -50%); }

@@ -11,27 +11,22 @@ if (renderer) {
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const geometry = new THREE.PlaneGeometry(2, 2);
-    const uniforms = { time: { value: 0 }, aspect: { value: 1 }, pointer: { value: new THREE.Vector2() }, energy: { value: 0 } };
-    // A single draw call blends flowing ribbons and sparse stars into the page.
+    const uniforms = { time: { value: 0 }, resolution: { value: new THREE.Vector2(1, 1) }, pointer: { value: new THREE.Vector2() }, energy: { value: 0 } };
+    // A fixed 16px monochrome dot matrix, with a restrained scanning highlight.
     const material = new THREE.ShaderMaterial({ uniforms, depthTest: false, depthWrite: false,
         vertexShader: 'varying vec2 uvPos; void main(){uvPos=uv;gl_Position=vec4(position.xy,0.,1.);}',
         fragmentShader: `precision mediump float;
-        varying vec2 uvPos; uniform float time, aspect, energy; uniform vec2 pointer;
-        float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+        varying vec2 uvPos; uniform float time, energy; uniform vec2 pointer, resolution;
         void main(){
-            vec2 p=uvPos+pointer*.012; vec3 color=vec3(.014,.025,.044);
-            for(int i=0;i<3;i++){
-                float f=float(i);
-                float wave=.25+f*.23+.12*sin(p.x*4.+time*.16+f*1.7)+.06*sin(p.x*8.-time*.1+f);
-                float d=abs(p.y-wave);
-                float glow=exp(-d*18.)*.10+exp(-d*100.)*.06;
-                vec3 tint=mix(vec3(.22,.65,.73),vec3(.38,.32,.66),f*.4);
-                color+=tint*glow*(.65+.35*sin(p.x*5.+f))*(1.+energy*.7);
-            }
-            vec2 grid=p*vec2(100.*aspect,100.); float seed=hash(floor(grid));
-            float star=(1.-smoothstep(0.,.09,length(fract(grid)-.5)))*step(.985,seed);
-            color+=vec3(.35,.58,.65)*star*(.25+.15*sin(time*.5+seed*100.));
-            color*=.7+.3*(1.-length(uvPos-.5)); gl_FragColor=vec4(color,1.);
+            vec2 pixel=uvPos*resolution;
+            vec2 cell=floor(pixel/16.);
+            vec2 center=(cell+.5)*16.;
+            float dotMask=1.-smoothstep(.75,1.45,length(pixel-center));
+            float scan=exp(-pow((mod(center.x+center.y*.3-time*24.,resolution.x+resolution.y*.3)-80.)/48.,2.));
+            vec2 mouse=(pointer*.5+.5)*resolution;
+            float nearby=exp(-length(center-mouse)/110.);
+            float light=.12+scan*.075+nearby*.04+energy*.09;
+            gl_FragColor=vec4(vec3(dotMask*light),1.);
         }`
     });
     scene.add(new THREE.Mesh(geometry, material));
@@ -58,7 +53,7 @@ if (renderer) {
     }
     function resize() {
         renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25)); renderer.setSize(innerWidth, innerHeight, false);
-        uniforms.aspect.value = innerWidth / Math.max(innerHeight, 1);
+        uniforms.resolution.value.set(innerWidth, innerHeight);
         if (!lost && !disposed && !document.hidden) render();
     }
     function pointerMove(event) { target.set(event.clientX / innerWidth * 2 - 1, 1 - event.clientY / innerHeight * 2); }
@@ -79,7 +74,7 @@ if (renderer) {
         const terminal = event.target.closest?.('.terminal-container');
         if (terminal?.animate) {
             terminal.getAnimations().forEach(animation => animation.cancel());
-            terminal.animate([{ boxShadow: 'inset 0 -2px 22px #78d7e025' }, { boxShadow: 'inset 0 -2px 22px #78d7e000' }], { duration: 260, easing: 'ease-out' });
+            terminal.animate([{ boxShadow: 'inset 0 -1px 0 #e8e8e870' }, { boxShadow: 'inset 0 -1px 0 #e8e8e800' }], { duration: 260, easing: 'ease-out' });
         }
     }
     toggle.addEventListener('click', () => { enabled = !enabled; try { localStorage.setItem('serial-gateway.motion', enabled ? 'on' : 'off'); } catch {} sync(); });
