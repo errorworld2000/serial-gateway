@@ -6,6 +6,7 @@
     <!-- xterm.js -->
     <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
     <script src="/vendor/xterm/xterm.js"></script>
+    <script src="/log-colors.js"></script>
     <link rel="stylesheet" href="/commands.css">
 
     <style>
@@ -744,6 +745,7 @@
             const socket = new WebSocket(wsUrl);
             socket.binaryType = 'arraybuffer';
             session.socket = socket;
+            const logWriter = createLogWriter(data => session.term.write(data));
 
             socket.onopen = () => {
                 session.indicator.classList.add('connected');
@@ -753,13 +755,14 @@
 
             socket.onmessage = (event) => {
                 if (event.data instanceof ArrayBuffer) {
-                    session.term.write(new Uint8Array(event.data));
+                    logWriter.push(new Uint8Array(event.data));
                 } else {
-                    session.term.write(event.data);
+                    logWriter.push(event.data);
                 }
             };
 
             socket.onclose = () => {
+                logWriter.close();
                 session.indicator.classList.remove('connected');
                 if (session.socket === socket) session.socket = null;
                 session.term.writeln(`\x1b[31m\r\n[SYS] DISCONNECTED FROM ${session.portName}\x1b[0m`);
