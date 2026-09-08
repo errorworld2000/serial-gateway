@@ -36,6 +36,14 @@ function initCommands(getSession) {
     let commands = [];
     let editing = -1;
     let running = null;
+    function showStatus(message, state = 'info') {
+        status.textContent = message;
+        status.setAttribute('data-state', state);
+        if (status.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            status.getAnimations().forEach(animation => animation.cancel());
+            status.animate([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 180, easing: 'ease-out' });
+        }
+    }
     try {
         const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
         if (!Array.isArray(saved) || saved.some(c => !c || typeof c.name !== 'string' || typeof c.text !== 'string')) throw new Error('Invalid data');
@@ -48,7 +56,7 @@ function initCommands(getSession) {
         try { localStorage.setItem(storageKey, JSON.stringify(next)); }
         catch { status.textContent = '保存失败：请检查浏览器存储权限或剩余空间。'; return false; }
         commands = next;
-        render();
+        render(true);
         return true;
     }
 
@@ -62,7 +70,7 @@ function initCommands(getSession) {
         byId('command-name').focus();
     }
 
-    function render() {
+    function render(animate = false) {
         list.replaceChildren();
         if (!commands.length) {
             const empty = document.createElement('p');
@@ -72,10 +80,11 @@ function initCommands(getSession) {
         }
         commands.forEach((command, index) => {
             const row = document.createElement('div');
-            row.className = 'command-row';
+            row.className = animate ? 'command-row command-enter' : 'command-row';
+            row.style.setProperty('--enter-delay', `${Math.min(index, 5) * 30}ms`);
             const run = document.createElement('button');
             run.type = 'button';
-            run.className = 'action-button command-run';
+            run.className = 'action-button command-run' + (running?.command === command ? ' is-running' : '');
             run.textContent = command.name;
             run.title = command.text;
             run.style.setProperty('--command-color', colors.includes(command.color) ? command.color : colors[0]);
@@ -105,14 +114,14 @@ function initCommands(getSession) {
         const session = getSession();
         const socket = session?.socket;
         if (!socket || socket.readyState !== WebSocket.OPEN) {
-            status.textContent = '请先选择已连接的串口。';
+            showStatus('请先选择已连接的串口。', 'error');
             return;
         }
-        const job = { cancelled: false };
+        const job = { cancelled: false, command };
         running = job;
         stop.hidden = false;
         render();
-        status.textContent = `正在向 ${session.portName} 发送：${command.name}`;
+        showStatus(`正在向 ${session.portName} 发送：${command.name}`, 'running');
         try {
             for (const chunk of parseCommand(command.text)) {
                 if (job.cancelled) throw new Error('已停止后续发送。');
@@ -123,10 +132,10 @@ function initCommands(getSession) {
                 else socket.send(chunk);
             }
             if (job.cancelled) throw new Error('已停止后续发送。');
-            status.textContent = `已发送到 ${session.portName}：${command.name}`;
+            showStatus(`已发送到 ${session.portName}：${command.name}`, 'success');
             if (getSession() === session) session.term.focus();
         } catch (error) {
-            status.textContent = error.message;
+            showStatus(error.message, 'error');
         } finally {
             running = null;
             stop.hidden = true;
@@ -144,7 +153,7 @@ function initCommands(getSession) {
         const next = [...commands];
         if (editing < 0) next.push(command);
         else next[editing] = command;
-        if (save(next)) { editor.hidden = true; status.textContent = '按钮已保存。'; }
+        if (save(next)) { editor.hidden = true; showStatus('按钮已保存。', 'success'); }
     };
-    render();
+    render(true);
 }
