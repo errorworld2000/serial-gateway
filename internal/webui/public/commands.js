@@ -48,6 +48,8 @@ function initCommands(getSession) {
         const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
         if (!Array.isArray(saved) || saved.some(c => !c || typeof c.name !== 'string' || typeof c.text !== 'string')) throw new Error('Invalid data');
         commands = saved;
+        commands.forEach(command => { if (typeof command.id !== 'string') command.id = `${Date.now()}-${Math.random().toString(36).slice(2)}`; });
+        try { localStorage.setItem(storageKey, JSON.stringify(commands)); } catch { /* Saving a later edit reports storage errors. */ }
     } catch {
         status.textContent = '无法读取已保存的按钮；可新建按钮。';
     }
@@ -81,6 +83,7 @@ function initCommands(getSession) {
         commands.forEach((command, index) => {
             const row = document.createElement('div');
             row.className = animate ? 'command-row command-enter' : 'command-row';
+            row.setAttribute('data-command-id', command.id);
             row.style.setProperty('--enter-delay', `${Math.min(index, 5) * 30}ms`);
             const run = document.createElement('button');
             run.type = 'button';
@@ -154,6 +157,7 @@ function initCommands(getSession) {
     editor.onsubmit = event => {
         event.preventDefault();
         const command = { name: byId('command-name').value.trim(), text: byId('command-text').value, color: byId('command-color').value };
+        command.id = commands[editing]?.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         if (!command.name || !command.text) return;
         const next = [...commands];
         if (editing < 0) next.push(command);

@@ -73,10 +73,12 @@ body .workbench .command-panel { background: var(--surface); border-color: var(-
 .hologram-globe i { position: absolute; inset: 0; border: 1px solid #dfc6acb0; border-radius: 50%; backface-visibility: visible; }
 @keyframes hologram-unfold { 0% { opacity: 0; transform: scale(.65); } 20% { opacity: .9; transform: scale(1); } 65% { opacity: .4; } 100% { opacity: 0; transform: scale(4.5,2.4); } }
 @media (prefers-reduced-motion: reduce) { .pet-eyes { animation: none; } .terminal-hologram { display: none; } }
-.command-habitat { position: relative; min-height: 220px; margin: 8px 0; background-image: radial-gradient(#333 1px, transparent 1px); background-size: 16px 16px; }
+.command-habitat { position: relative; min-height: 160px; margin: 8px 0; background-image: radial-gradient(#333 .8px, transparent 1px); background-size: 8px 8px; }
 .command-habitat #command-list { position: absolute; inset: 0; }
-.command-habitat .command-row { position: absolute; height: 40px; margin: 0; animation: none; }
-.command-habitat .command-run { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; }
+.command-habitat .command-row { position: absolute; margin: 0; animation: none; }
+.command-habitat .command-run { white-space: normal; overflow-wrap: anywhere; display: block; width: 100%; height: 100%; box-sizing: border-box; padding: 3px 5px; font-size: 11px; line-height: 14px; border-left-width: 2px; cursor: grab; touch-action: none; user-select: none; }
+.command-habitat .command-row.dragging { z-index: 3; outline: 1px dotted #d49779; outline-offset: 3px; }
+.command-habitat .command-row.dragging .command-run { cursor: grabbing; }
 .command-habitat .desk-pet { position: absolute; z-index: 2; width: 38px; height: 34px; padding: 0; margin: 0; border: 0; }
 .command-habitat .desk-pet svg { width: 38px; height: 34px; transform: scaleX(var(--pet-facing, 1)); }
 .command-habitat .desk-pet > span { display: none; }
