@@ -2,6 +2,48 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { colorKernelLine, createLogWriter } = require('../internal/webui/public/log-colors.js');
 
+test('echo, prompts, editing controls and split UTF-8 render without timers', () => {
+    const output = [];
+    const writer = createLogWriter(s => output.push(s), () => assert.fail('interactive output must not wait'));
+    for (const text of ['root# ', 'l', 's', '\b \b', '\x1b[D']) {
+        writer.push(text);
+        assert.equal(output.at(-1), text);
+    }
+    const bytes = new TextEncoder().encode('设备');
+    writer.push(bytes.slice(0, 2));
+    writer.push(bytes.slice(2));
+    assert.equal(output.at(-1), '设备');
+    writer.close();
+});
+
+test('ambiguous log prefixes flush as soon as they become ordinary echo', () => {
+    const output = []; let scheduled = 0, canceled = 0;
+    const writer = createLogWriter(s => output.push(s), () => ++scheduled, () => canceled++);
+    writer.push('[');
+    assert.equal(output.length, 0);
+    writer.push('A');
+    assert.equal(output.join(''), '[A');
+    assert.equal(scheduled, 1);
+    assert.equal(canceled, 1);
+    writer.close();
+});
+
+test('fragmented timestamped logs retain coloring and a bounded deadline', () => {
+    const output = []; let flush, scheduled = 0;
+    const writer = createLogWriter(s => output.push(s), (f, ms) => {
+        assert.equal(ms, 24); flush = f; return ++scheduled;
+    }, () => {});
+    for (const part of ['<', '3>', '[ ', '12.', '5] ', 'failed']) writer.push(part);
+    assert.equal(output.length, 0);
+    assert.equal(scheduled, 1);
+    writer.push('\n');
+    assert.equal(output.join(''), colorKernelLine('<3>[ 12.5] failed\n'));
+    writer.push('[2] unfinished');
+    flush();
+    assert.ok(output.at(-1).includes('unfinished'));
+    writer.close();
+});
+
 test('a burst of 1000 log lines uses one terminal write and preserves every line', () => {
     const output = [];
     const writer = createLogWriter(s => output.push(s));
@@ -34,7 +76,7 @@ test('fragmented UTF-8, prompt flush, and no partial-line recoloring', () => {
 test('native ANSI state across frames is retained', () => {
     const output = []; let flush;
     const writer = createLogWriter(s => output.push(s), f => { flush = f; return 1; }, () => {});
-    writer.push('\x1b[32m'); flush(); writer.push('\n[1] ready\n');
+    writer.push('\x1b[32m'); writer.push('\n[1] ready\n');
     assert.equal(output.join(''), '\x1b[32m\n[1] ready\n');
     writer.push('\x1b[0m\n[2] failed\n');
     assert.ok(output.at(-1).includes('\x1b[31m'));

@@ -16,6 +16,13 @@ function createLogWriter(write, schedule = setTimeout, cancel = clearTimeout) {
     let pending = '', timer = null, continuation = false, ansiActive = false;
     // Keep a small tail so a reset split across network frames is recognized.
     let controlTail = '';
+    function mayBeKernelLog(text) {
+        // Only timestamp prefixes need a complete line for severity coloring.
+        if (/^\r?<\d{0,3}$/.test(text)) return true;
+        text = text.replace(/^\r?(?:<\d{1,3}>)?/, '');
+        return text === '' || /^\[\s*(?:\d+(?:\.\d*)?)?$/.test(text) ||
+            /^\[\s*\d+(?:\.\d+)?\][^\x00-\x1f\x7f-\x9f]*\r?$/.test(text);
+    }
     function emit(text, complete, output = write) {
         const native = ansiActive || text.includes('\x1b') || /[\x80-\x9f]/.test(text);
         output(!continuation && !native ? colorKernelLine(text) : text);
@@ -40,8 +47,9 @@ function createLogWriter(write, schedule = setTimeout, cancel = clearTimeout) {
             emit(line, true, text => batch.push(text));
         }
         if (batch.length) write(batch.join(''));
-        if (pending.length > 8192) flush();
-        // Bound prompt/interactive latency; continuous traffic cannot postpone this timer.
+        if (pending && (continuation || ansiActive || !mayBeKernelLog(pending) || pending.length > 8192)) flush();
+        if (!pending && timer !== null) { cancel(timer); timer = null; }
+        // Bound ambiguous log-prefix latency; ordinary echo is already written above.
         if (pending && timer === null) timer = schedule(flush, 24);
     }
     return { push, close() { pending += decoder.decode(); flush(); } };
