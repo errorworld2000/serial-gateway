@@ -1,6 +1,16 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { colorKernelLine, createLogWriter } = require('../internal/webui/public/log-colors.js');
+
+test('a burst of 1000 log lines uses one terminal write and preserves every line', () => {
+    const output = [];
+    const writer = createLogWriter(s => output.push(s));
+    const lines = Array.from({ length: 1000 }, (_, i) => `[${i}] device ready\r\n`);
+    writer.push(lines.join(''));
+    assert.equal(output.join(''), lines.map(colorKernelLine).join(''));
+    assert.equal(output.length, 1);
+    writer.close();
+});
 test('kernel timestamps, severity and unchanged text', () => {
     for (const [line, color] of [['[ 1.25] device ready\r\n', 37], ['[2.0] probe failed\n', 31], ['[3] timeout\n', 33], ['<3>[4] device stopped\n', 31]]) {
         const rendered = colorKernelLine(line);

@@ -11,12 +11,14 @@
     const random = n => { const x = Math.sin(n * 127.1 + seed) * 43758.5453; return x - Math.floor(x); };
     let obstacles = [], x = 0, y = 0, angle = 0, frame = 0, last = 0, turnAt = 0;
     const width = 38, height = 34, padding = 5;
+    let arenaWidth = 0, arenaHeight = 0;
     function clear(px, py) {
-        return px >= padding && py >= padding && px + width <= arena.clientWidth - padding && py + height <= arena.clientHeight - padding &&
+        return px >= padding && py >= padding && px + width <= arenaWidth - padding && py + height <= arenaHeight - padding &&
             obstacles.every(r => px + width + 4 <= r.x || px >= r.x + r.w + 4 || py + height + 4 <= r.y || py >= r.y + r.h + 4);
     }
     function placePet() {
-        pet.style.left = `${x}px`; pet.style.top = `${y}px`;
+        // Translation does not invalidate layout and composes with the greeting transform.
+        pet.style.translate = `${x}px ${y}px`;
         pet.style.setProperty('--pet-facing', Math.cos(angle) < 0 ? '-1' : '1');
     }
     const positionsKey = 'serial-gateway.command-positions.v1';
@@ -28,8 +30,8 @@
     const overlaps = (a, b) => a.x < b.x + b.w + 8 && a.x + a.w + 8 > b.x && a.y < b.y + b.h + 8 && a.y + a.h + 8 > b.y;
     function relocatePet() {
         if (clear(x, y)) return;
-        for (let py = arena.clientHeight - height - 8; py >= 8; py -= 8) {
-            for (let px = arena.clientWidth - width - 8; px >= 8; px -= 8) {
+        for (let py = arenaHeight - height - 8; py >= 8; py -= 8) {
+            for (let px = arenaWidth - width - 8; px >= 8; px -= 8) {
                 if (clear(px, py)) { x = px; y = py; placePet(); return; }
             }
         }
@@ -37,6 +39,7 @@
     let dragging = null, suppressClick = false;
     function layout() {
         if (dragging) return;
+        arenaWidth = arena.clientWidth;
         const rows = [...list.querySelectorAll('.command-row')];
         obstacles = [];
         rows.forEach((row, index) => {
@@ -55,6 +58,7 @@
             obstacles.push(rect);
         });
         arena.style.height = `${Math.max(160, ...obstacles.map(r => r.y + r.h + 64))}px`;
+        arenaHeight = arena.clientHeight;
         relocatePet(); placePet();
     }
     list.addEventListener('pointerdown', event => {
@@ -95,7 +99,7 @@
     function tick(now) {
         frame = requestAnimationFrame(tick);
         const dt = Math.min((now - last) / 1000, .04); last = now;
-        if (pet.matches(':hover, :focus') || !arena.getClientRects().length) return;
+        if (pet.matches(':hover, :focus') || !arenaWidth || !arenaHeight) return;
         if (now > turnAt) { angle += (Math.random() - .5) * 1.5; turnAt = now + 1500 + Math.random() * 2000; }
         let nx = x + Math.cos(angle) * 28 * dt, ny = y + Math.sin(angle) * 28 * dt;
         if (!clear(nx, ny)) {

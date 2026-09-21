@@ -16,9 +16,9 @@ function createLogWriter(write, schedule = setTimeout, cancel = clearTimeout) {
     let pending = '', timer = null, continuation = false, ansiActive = false;
     // Keep a small tail so a reset split across network frames is recognized.
     let controlTail = '';
-    function emit(text, complete) {
+    function emit(text, complete, output = write) {
         const native = ansiActive || text.includes('\x1b') || /[\x80-\x9f]/.test(text);
-        write(!continuation && !native ? colorKernelLine(text) : text);
+        output(!continuation && !native ? colorKernelLine(text) : text);
         const controls = controlTail + text;
         for (const match of controls.matchAll(/\x1b(?:\[(?:0)?m)?/g)) {
             ansiActive = match[0] !== '\x1b[0m' && match[0] !== '\x1b[m';
@@ -34,10 +34,12 @@ function createLogWriter(write, schedule = setTimeout, cancel = clearTimeout) {
     function push(data) {
         pending += typeof data === 'string' ? data : decoder.decode(data, { stream: true });
         let end;
+        const batch = [];
         while ((end = pending.indexOf('\n')) !== -1) {
             const line = pending.slice(0, end + 1); pending = pending.slice(end + 1);
-            emit(line, true);
+            emit(line, true, text => batch.push(text));
         }
+        if (batch.length) write(batch.join(''));
         if (pending.length > 8192) flush();
         // Bound prompt/interactive latency; continuous traffic cannot postpone this timer.
         if (pending && timer === null) timer = schedule(flush, 24);
